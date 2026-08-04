@@ -166,8 +166,7 @@ function setThinking(on) {
 
 async function handleSend(text) {
   if (!text.trim()) return;
-  renderMessage('assistant', reply, Date.now());
-} catch (err) {
+  renderMessage('user', text, Date.now());
   textInput.value = '';
   textInput.style.height = 'auto';
   setThinking(true);
