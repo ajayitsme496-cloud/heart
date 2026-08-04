@@ -8,7 +8,7 @@
 // Get your key at https://aistudio.google.com/apikey
 
 const GEMINI_API_KEY = "AQ.Ab8RN6JRL7JM58UsJIWLMPdVxLP8ITN7HoCvbRW9YMesk88hbw";
-const GEMINI_MODEL = "gemini-2.0-flash";
+const GEMINI_MODEL = "gemini-1.5-flash";
 
 const Chat = (() => {
   const STORAGE_KEY = "heart_chat_history";
