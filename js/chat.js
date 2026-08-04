@@ -10,7 +10,7 @@
 //
 // Put your key below before building. Get one at https://console.anthropic.com
 
-const ANTHROPIC_API_KEY = "YOUR_API_KEY_HERE";
+const ANTHROPIC_API_KEY = "AQ.Ab8RN6KSCm1bxEsaK_cq7iDER9iq-Bon-R5wGVaCFRGShOONsg";
 
 const Chat = (() => {
   const STORAGE_KEY = "heart_chat_history";
