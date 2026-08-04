@@ -133,3 +133,24 @@ header{
 .icon-btn.mic.listening{ background: var(--heart); border-color: var(--heart); color:#fff; }
 #sendBtn{ background: var(--heart); border-color: var(--heart); color:#fff; }
 #sendBtn:disabled{ opacity:0.4; }
+/* ---- Avatar character ---- */
+.avatar { display:flex; align-items:center; justify-content:center; }
+.avatar-face { fill: var(--surface); stroke: var(--heart-dim); stroke-width:2; transition: fill .3s ease; }
+.avatar-eye { fill: var(--text-hi); transition: fill .3s ease; }
+.avatar-mouth { fill:none; stroke: var(--text-hi); stroke-width:2.5; stroke-linecap:round; transition: d .2s ease; }
+
+.avatar.happy .avatar-face { fill: #2a4a3a; }
+.avatar.happy .avatar-mouth { d: path("M18,36 Q30,46 42,36"); }
+
+.avatar.stressed .avatar-face { fill: #4a2a30; }
+.avatar.stressed .avatar-mouth { d: path("M18,42 Q30,34 42,42"); }
+
+.avatar.neutral .avatar-face { fill: var(--surface); }
+
+.avatar.speaking .avatar-mouth {
+  animation: mouthTalk 0.35s ease-in-out infinite alternate;
+}
+@keyframes mouthTalk {
+  from { d: path("M20,38 Q30,40 40,38"); }
+  to   { d: path("M20,36 Q30,46 40,36"); }
+}
