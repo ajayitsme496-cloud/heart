@@ -1,21 +1,19 @@
 // chat.js
 //
-// IMPORTANT SECURITY NOTE:
-// This app calls the Anthropic API directly from the device with an embedded API key.
-// That is only reasonable for a strictly personal app that you build and run yourself,
-// never distributed to others (an API key baked into an app anyone else could install
-// or decompile is a real exposure risk). If you ever want to share this app with other
-// people, route requests through your own small backend server that holds the key
-// instead, and have the app call your server.
+// This uses Google's Gemini API (generativelanguage.googleapis.com), which has
+// a free tier — good for a personal app like this with no billing required.
 //
-// Put your key below before building. Get one at https://console.anthropic.com
+// SECURITY NOTE: This key is embedded in the app and visible to anyone who
+// finds your page's URL. Keep this project personal — don't share the link.
+// Get your key at https://aistudio.google.com/apikey
 
-const ANTHROPIC_API_KEY = "AQ.Ab8RN6KSCm1bxEsaK_cq7iDER9iq-Bon-R5wGVaCFRGShOONsg";
+const GEMINI_API_KEY = "YOUR_GOOGLE_AI_STUDIO_KEY_HERE";
+const GEMINI_MODEL = "gemini-2.0-flash";
 
 const Chat = (() => {
   const STORAGE_KEY = "heart_chat_history";
-  let history = []; // {role, content, ts}
-  let getMoodContext = () => null; // app.js can override this to inject current mood
+  let history = []; // {role: 'user'|'assistant', content, ts}
+  let getMoodContext = () => null;
 
   function setMoodContextProvider(fn) {
     getMoodContext = fn;
@@ -65,21 +63,20 @@ const Chat = (() => {
       system += ` For context only (never mention this explicitly unless relevant): the person's current facial expression reads as "${moodNote}". Let it inform your tone subtly, don't diagnose or call attention to it.`;
     }
 
-    const apiMessages = history.map(m => ({ role: m.role, content: m.content }));
+    // Gemini expects roles "user" and "model" (not "assistant")
+    const contents = history.map(m => ({
+      role: m.role === "assistant" ? "model" : "user",
+      parts: [{ text: m.content }]
+    }));
 
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+
+    const response = await fetch(url, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-        "anthropic-dangerous-direct-browser-access": "true"
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "claude-sonnet-4-6",
-        max_tokens: 1000,
-        system,
-        messages: apiMessages
+        systemInstruction: { parts: [{ text: system }] },
+        contents
       })
     });
 
@@ -89,8 +86,8 @@ const Chat = (() => {
     }
 
     const data = await response.json();
-    const textBlocks = (data.content || []).filter(b => b.type === "text").map(b => b.text);
-    const reply = textBlocks.join("\n").trim() || "I didn't quite catch that — could you try again?";
+    const parts = data.candidates?.[0]?.content?.parts || [];
+    const reply = parts.map(p => p.text).join("\n").trim() || "I didn't quite catch that — could you try again?";
     pushAssistant(reply);
     return reply;
   }
