@@ -283,5 +283,27 @@ async function pollMood() {
   moodPollTimer = setTimeout(pollMood, 1200);
 }
 
+// ---------------- Voice toggle + avatar mouth animation ----------------
+const avatarEl = document.getElementById('avatar');
+const voiceToggleBtn = document.getElementById('voiceToggleBtn');
+
+Voice.setCallbacks(
+  () => avatarEl.classList.add('speaking'),
+  () => avatarEl.classList.remove('speaking')
+);
+
+voiceToggleBtn.addEventListener('click', () => {
+  const on = Voice.toggle();
+  voiceToggleBtn.textContent = on ? '🔊' : '🔇';
+});
+
+// keep avatar expression in sync with mood dot
+const originalPollMood = pollMood;
+pollMood = async function() {
+  await originalPollMood();
+  avatarEl.classList.remove('happy', 'stressed', 'neutral');
+  avatarEl.classList.add(moodDot.className.replace('status-dot', '').trim() || 'neutral');
+};
+
 // ---------------- Boot ----------------
 boot();
