@@ -7,7 +7,7 @@
 // finds your page's URL. Keep this project personal — don't share the link.
 // Get your key at https://aistudio.google.com/apikey
 
-const GEMINI_API_KEY = "YOUR_GOOGLE_AI_STUDIO_KEY_HERE";
+const GEMINI_API_KEY = "AQ.Ab8RN6JLuFZ88WrgnzkOXJeHp4vs06CnToxMzN5kOCzW4Hr24w";
 const GEMINI_MODEL = "gemini-2.0-flash";
 
 const Chat = (() => {
