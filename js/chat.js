@@ -1,18 +1,16 @@
 // chat.js
 //
-// This uses Google's Gemini API (generativelanguage.googleapis.com), which has
-// a free tier — good for a personal app like this with no billing required.
+// Uses Groq's API (console.groq.com) — free tier, fast, no billing required.
 //
 // SECURITY NOTE: This key is embedded in the app and visible to anyone who
 // finds your page's URL. Keep this project personal — don't share the link.
-// Get your key at https://aistudio.google.com/apikey
 
-const GEMINI_API_KEY = "AQ.Ab8RN6JRL7JM58UsJIWLMPdVxLP8ITN7HoCvbRW9YMesk88hbw";
-const GEMINI_MODEL = "gemini-1.5-flash";
+const GROQ_API_KEY = "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";
+const GROQ_MODEL = "llama-3.3-70b-versatile";
 
 const Chat = (() => {
   const STORAGE_KEY = "heart_chat_history";
-  let history = []; // {role: 'user'|'assistant', content, ts}
+  let history = [];
   let getMoodContext = () => null;
 
   function setMoodContextProvider(fn) {
@@ -63,20 +61,20 @@ const Chat = (() => {
       system += ` For context only (never mention this explicitly unless relevant): the person's current facial expression reads as "${moodNote}". Let it inform your tone subtly, don't diagnose or call attention to it.`;
     }
 
-    // Gemini expects roles "user" and "model" (not "assistant")
-    const contents = history.map(m => ({
-      role: m.role === "assistant" ? "model" : "user",
-      parts: [{ text: m.content }]
-    }));
+    const messages = [
+      { role: "system", content: system },
+      ...history.map(m => ({ role: m.role, content: m.content }))
+    ];
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
-
-    const response = await fetch(url, {
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${GROQ_API_KEY}`
+      },
       body: JSON.stringify({
-        systemInstruction: { parts: [{ text: system }] },
-        contents
+        model: GROQ_MODEL,
+        messages
       })
     });
 
@@ -86,8 +84,7 @@ const Chat = (() => {
     }
 
     const data = await response.json();
-    const parts = data.candidates?.[0]?.content?.parts || [];
-    const reply = parts.map(p => p.text).join("\n").trim() || "I didn't quite catch that — could you try again?";
+    const reply = data.choices?.[0]?.message?.content?.trim() || "I didn't quite catch that — could you try again?";
     pushAssistant(reply);
     return reply;
   }
