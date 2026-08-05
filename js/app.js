@@ -174,12 +174,6 @@ async function handleSend(text) {
     const reply = await Chat.send(text);
     renderMessage('assistant', reply, Date.now());
   } catch (err) {
-    renderMessage('assistant', 'Something went wrong reaching Heart. Check your API key and connection, then try again.', Date.now(), true);
-  } finally {
-    setThinking(false);
-  }
-}
-
 sendBtn.addEventListener('click', () => handleSend(textInput.value));
 textInput.addEventListener('keydown', e => {
   if (e.key === 'Enter' && !e.shiftKey) {
