@@ -278,7 +278,7 @@ cameraToggleBtn.addEventListener('click', async () => {
     currentMood = null;
     moodDot.className = 'status-dot';
     moodDot.title = 'No face detected';
-    avatarEl.classList.remove('happy', 'stressed');
+    avatarEl.classList.remove('happy', 'sad', 'angry', 'fearful', 'disgusted', 'thinking', 'neutral');
     avatarEl.classList.add('neutral');
     clearTimeout(moodPollTimer);
   }
@@ -292,13 +292,23 @@ async function pollMood() {
     const expr = FaceEngine.topExpression(result.expressions);
     currentMood = expr;
     moodLabel.textContent = expr || '—';
+    
     if (expr === 'happy' || expr === 'surprised') {
       moodClass = 'happy';
-    } else if (expr === 'sad' || expr === 'angry' || expr === 'fearful' || expr === 'disgusted') {
-      moodClass = 'stressed';
+    } else if (expr === 'sad') {
+      moodClass = 'sad';
+    } else if (expr === 'angry') {
+      moodClass = 'angry';
+    } else if (expr === 'fearful') {
+      moodClass = 'fearful';
+    } else if (expr === 'disgusted') {
+      moodClass = 'disgusted';
+    } else if (expr === 'neutral') {
+      moodClass = 'thinking';
     } else {
       moodClass = 'neutral';
     }
+    
     moodDot.className = 'status-dot ' + moodClass;
     moodDot.title = expr ? `Reading: ${expr}` : 'No face detected';
     if (FaceEngine.hasEnrollment()) {
@@ -310,7 +320,7 @@ async function pollMood() {
     moodDot.className = 'status-dot';
     moodDot.title = 'No face detected';
   }
-  avatarEl.classList.remove('happy', 'stressed', 'neutral');
+  avatarEl.classList.remove('happy', 'sad', 'angry', 'fearful', 'disgusted', 'thinking', 'neutral');
   avatarEl.classList.add(moodClass);
   moodPollTimer = setTimeout(pollMood, 1200);
 }
