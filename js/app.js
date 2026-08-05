@@ -40,10 +40,8 @@ function showScreen(el) {
   el.style.display = 'flex';
 }
 
-// ---------------- BOOT LOGIC ----------------
 function boot() {
   if (!WebAuthnLock.supported()) {
-    // No WebAuthn support (e.g. http:// instead of https://) — skip straight through
     proceedToFaceEnrollOrMain();
     return;
   }
@@ -84,7 +82,6 @@ function proceedToFaceEnrollOrMain() {
   }
 }
 
-// ---------------- ENROLLMENT SCREEN (mood/recognition face-api model) ----------------
 async function startEnrollment() {
   showScreen(enrollScreen);
   enrollStatus.textContent = "Loading face model…";
@@ -126,7 +123,6 @@ skipEnrollBtn.addEventListener('click', () => {
   startMain();
 });
 
-// ---------------- MAIN SCREEN ----------------
 function startMain() {
   showScreen(mainScreen);
   Chat.load().forEach(m => renderMessage(m.role, m.content, m.ts));
@@ -174,6 +170,12 @@ async function handleSend(text) {
     const reply = await Chat.send(text);
     renderMessage('assistant', reply, Date.now());
   } catch (err) {
+    renderMessage('assistant', 'Something went wrong reaching Heart. Check your API key and connection, then try again.', Date.now(), true);
+  } finally {
+    setThinking(false);
+  }
+}
+
 sendBtn.addEventListener('click', () => handleSend(textInput.value));
 textInput.addEventListener('keydown', e => {
   if (e.key === 'Enter' && !e.shiftKey) {
@@ -197,7 +199,6 @@ clearBtn.addEventListener('click', () => {
   emptyState.style.display = 'block';
 });
 
-// ---------------- Voice input ----------------
 let recognizing = false;
 let recognition = null;
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -223,80 +224,5 @@ if (SpeechRecognition) {
   micBtn.style.display = 'none';
 }
 
-// ---------------- Live face/mood awareness (opt-in toggle) ----------------
 cameraToggleBtn.addEventListener('click', async () => {
-  livenessOn = !livenessOn;
-  cameraToggleBtn.classList.toggle('active', livenessOn);
-  if (livenessOn) {
-    miniCameraWrap.style.display = 'block';
-    try {
-      await FaceEngine.loadModels();
-      await FaceEngine.startCamera(liveVideo);
-      pollMood();
-    } catch (e) {
-      moodLabel.textContent = 'no camera';
-      livenessOn = false;
-      cameraToggleBtn.classList.remove('active');
-      miniCameraWrap.style.display = 'none';
-    }
-  } else {
-    FaceEngine.stopCamera(liveVideo);
-    miniCameraWrap.style.display = 'none';
-    currentMood = null;
-    moodDot.className = 'status-dot';
-    moodDot.title = 'No face detected';
-    clearTimeout(moodPollTimer);
-  }
-});
-
-async function pollMood() {
-  if (!livenessOn) return;
-  const result = await FaceEngine.detectOnce(liveVideo);
-  if (result) {
-    const expr = FaceEngine.topExpression(result.expressions);
-    currentMood = expr;
-    moodLabel.textContent = expr || '—';
-    if (expr === 'happy' || expr === 'surprised') {
-      moodDot.className = 'status-dot happy';
-    } else if (expr === 'sad' || expr === 'angry' || expr === 'fearful' || expr === 'disgusted') {
-      moodDot.className = 'status-dot stressed';
-    } else {
-      moodDot.className = 'status-dot neutral';
-    }
-    moodDot.title = expr ? `Reading: ${expr}` : 'No face detected';
-    if (FaceEngine.hasEnrollment()) {
-      const isYou = FaceEngine.isMatch(result.descriptor);
-      moodDot.title += isYou ? ' (recognized: you)' : ' (unrecognized face)';
-    }
-  } else {
-    moodLabel.textContent = '—';
-    moodDot.className = 'status-dot';
-    moodDot.title = 'No face detected';
-  }
-  moodPollTimer = setTimeout(pollMood, 1200);
-}
-
-// ---------------- Voice toggle + avatar mouth animation ----------------
-const avatarEl = document.getElementById('avatar');
-const voiceToggleBtn = document.getElementById('voiceToggleBtn');
-
-Voice.setCallbacks(
-  () => avatarEl.classList.add('speaking'),
-  () => avatarEl.classList.remove('speaking')
-);
-
-voiceToggleBtn.addEventListener('click', () => {
-  const on = Voice.toggle();
-  voiceToggleBtn.textContent = on ? '🔊' : '🔇';
-});
-
-// keep avatar expression in sync with mood dot
-const originalPollMood = pollMood;
-pollMood = async function() {
-  await originalPollMood();
-  avatarEl.classList.remove('happy', 'stressed', 'neutral');
-  avatarEl.classList.add(moodDot.className.replace('status-dot', '').trim() || 'neutral');
-};
-
-// ---------------- Boot ----------------
-boot();
+  livenessOn = !liven
