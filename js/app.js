@@ -295,8 +295,6 @@ voiceToggleBtn.addEventListener('click', () => {
   const on = Voice.toggle();
   voiceToggleBtn.textContent = on ? '🔊' : '🔇';
 });
-
-boot();
 // ---- Notes management ----
 const notesToggleBtn = document.getElementById('notesToggleBtn');
 const notesSection = document.getElementById('notesSection');
@@ -352,6 +350,7 @@ function renderNotesList() {
   });
 }
 
+
 window.editNote = (id) => {
   const note = Notes.getAll().find(n => n.id === id);
   if (!note) return;
@@ -401,5 +400,7 @@ renderMessage = function(role, content, ts, isError) {
     bubble.parentElement.appendChild(saveBtn);
   }
 };
+
+boot();
 
 boot();
