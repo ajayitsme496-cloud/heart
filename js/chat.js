@@ -54,7 +54,6 @@ const Chat = (() => {
     pushUser(text);
 
 
-    const moodNote = getMoodContext();
  const moodNote = getMoodContext();
     let system = "You are Heart, a warm, capable, all-purpose personal assistant. " +
       "You help with anything: planning, learning, brainstorming, emotional check-ins, or casual conversation. " +
