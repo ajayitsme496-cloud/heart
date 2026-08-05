@@ -37,16 +37,22 @@ const notesSearch = document.getElementById('notesSearch');
 const notesList = document.getElementById('notesList');
 
 let currentMood = null;
+let currentObjects = [];
 let moodPollTimer = null;
 let livenessOn = false;
 let notesMode = false;
+let visionReady = false;
 
 function showScreen(el) {
   [setupScreen, lockScreen, enrollScreen, mainScreen].forEach(s => s.style.display = 'none');
   el.style.display = 'flex';
 }
 
-function boot() {
+async function boot() {
+  await Vision.loadModel().then(ok => {
+    if (ok) visionReady = true;
+  });
+  
   if (!WebAuthnLock.supported()) {
     proceedToFaceEnrollOrMain();
     return;
@@ -134,6 +140,7 @@ function startMain() {
   Chat.load().forEach(m => renderMessage(m.role, m.content, m.ts));
   if (Chat.getHistory().length) emptyState.style.display = 'none';
   Chat.setMoodContextProvider(() => currentMood);
+  Chat.setVisionContextProvider(() => currentObjects.length ? currentObjects.join(', ') : null);
 }
 
 function fmtTime(ts) {
@@ -266,6 +273,12 @@ cameraToggleBtn.addEventListener('click', async () => {
       await FaceEngine.loadModels();
       await FaceEngine.startCamera(liveVideo);
       pollMood();
+      if (visionReady) {
+        Vision.setDetectionCallback((objects) => {
+          currentObjects = objects;
+        });
+        Vision.startDetection(liveVideo, 1500);
+      }
     } catch (e) {
       moodLabel.textContent = 'no camera';
       livenessOn = false;
@@ -276,11 +289,13 @@ cameraToggleBtn.addEventListener('click', async () => {
     FaceEngine.stopCamera(liveVideo);
     miniCameraWrap.style.display = 'none';
     currentMood = null;
+    currentObjects = [];
     moodDot.className = 'status-dot';
     moodDot.title = 'No face detected';
     avatarEl.classList.remove('happy', 'sad', 'angry', 'fearful', 'disgusted', 'thinking', 'neutral');
     avatarEl.classList.add('neutral');
     clearTimeout(moodPollTimer);
+    Vision.stopDetection();
   }
 });
 
