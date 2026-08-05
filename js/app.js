@@ -30,6 +30,8 @@ const miniCameraWrap = document.getElementById('mini-camera-wrap');
 const liveVideo = document.getElementById('liveVideo');
 const moodLabel = document.getElementById('moodLabel');
 const moodDot = document.getElementById('moodDot');
+const avatarEl = document.getElementById('avatar');
+const voiceToggleBtn = document.getElementById('voiceToggleBtn');
 
 let currentMood = null;
 let moodPollTimer = null;
@@ -169,6 +171,7 @@ async function handleSend(text) {
   try {
     const reply = await Chat.send(text);
     renderMessage('assistant', reply, Date.now());
+    Voice.speak(reply);
   } catch (err) {
     renderMessage('assistant', 'Something went wrong reaching Heart. Check your API key and connection, then try again.', Date.now(), true);
   } finally {
@@ -225,4 +228,72 @@ if (SpeechRecognition) {
 }
 
 cameraToggleBtn.addEventListener('click', async () => {
-  livenessOn = !liven
+  livenessOn = !livenessOn;
+  cameraToggleBtn.classList.toggle('active', livenessOn);
+  if (livenessOn) {
+    miniCameraWrap.style.display = 'block';
+    try {
+      await FaceEngine.loadModels();
+      await FaceEngine.startCamera(liveVideo);
+      pollMood();
+    } catch (e) {
+      moodLabel.textContent = 'no camera';
+      livenessOn = false;
+      cameraToggleBtn.classList.remove('active');
+      miniCameraWrap.style.display = 'none';
+    }
+  } else {
+    FaceEngine.stopCamera(liveVideo);
+    miniCameraWrap.style.display = 'none';
+    currentMood = null;
+    moodDot.className = 'status-dot';
+    moodDot.title = 'No face detected';
+    avatarEl.classList.remove('happy', 'stressed');
+    avatarEl.classList.add('neutral');
+    clearTimeout(moodPollTimer);
+  }
+});
+
+async function pollMood() {
+  if (!livenessOn) return;
+  const result = await FaceEngine.detectOnce(liveVideo);
+  let moodClass = 'neutral';
+  if (result) {
+    const expr = FaceEngine.topExpression(result.expressions);
+    currentMood = expr;
+    moodLabel.textContent = expr || '—';
+    if (expr === 'happy' || expr === 'surprised') {
+      moodClass = 'happy';
+    } else if (expr === 'sad' || expr === 'angry' || expr === 'fearful' || expr === 'disgusted') {
+      moodClass = 'stressed';
+    } else {
+      moodClass = 'neutral';
+    }
+    moodDot.className = 'status-dot ' + moodClass;
+    moodDot.title = expr ? `Reading: ${expr}` : 'No face detected';
+    if (FaceEngine.hasEnrollment()) {
+      const isYou = FaceEngine.isMatch(result.descriptor);
+      moodDot.title += isYou ? ' (recognized: you)' : ' (unrecognized face)';
+    }
+  } else {
+    moodLabel.textContent = '—';
+    moodDot.className = 'status-dot';
+    moodDot.title = 'No face detected';
+  }
+  avatarEl.classList.remove('happy', 'stressed', 'neutral');
+  avatarEl.classList.add(moodClass);
+  moodPollTimer = setTimeout(pollMood, 1200);
+}
+
+// ---------------- Voice toggle ----------------
+Voice.setCallbacks(
+  () => avatarEl.classList.add('speaking'),
+  () => avatarEl.classList.remove('speaking')
+);
+
+voiceToggleBtn.addEventListener('click', () => {
+  const on = Voice.toggle();
+  voiceToggleBtn.textContent = on ? '🔊' : '🔇';
+});
+
+boot();
