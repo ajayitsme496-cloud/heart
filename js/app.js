@@ -1,5 +1,3 @@
-// app.js — wires setup/lock/enrollment/main screens together for the web (PWA) build
-
 const setupScreen = document.getElementById('setupScreen');
 const lockScreen = document.getElementById('lockScreen');
 const enrollScreen = document.getElementById('enrollScreen');
@@ -32,10 +30,16 @@ const moodLabel = document.getElementById('moodLabel');
 const moodDot = document.getElementById('moodDot');
 const avatarEl = document.getElementById('avatar');
 const voiceToggleBtn = document.getElementById('voiceToggleBtn');
+const notesToggleBtn = document.getElementById('notesToggleBtn');
+const notesSection = document.getElementById('notesSection');
+const notesNewBtn = document.getElementById('notesNewBtn');
+const notesSearch = document.getElementById('notesSearch');
+const notesList = document.getElementById('notesList');
 
 let currentMood = null;
 let moodPollTimer = null;
 let livenessOn = false;
+let notesMode = false;
 
 function showScreen(el) {
   [setupScreen, lockScreen, enrollScreen, mainScreen].forEach(s => s.style.display = 'none');
@@ -153,6 +157,32 @@ function renderMessage(role, content, ts, isError) {
 
   wrap.appendChild(bubble);
   wrap.appendChild(time);
+  
+  if (role === 'assistant' && !isError) {
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'note-save-btn';
+    saveBtn.textContent = '💾 Save';
+    saveBtn.style.marginTop = '8px';
+    saveBtn.style.fontSize = '12px';
+    saveBtn.style.padding = '4px 8px';
+    saveBtn.style.background = 'var(--heart-dim)';
+    saveBtn.style.border = 'none';
+    saveBtn.style.color = '#fff';
+    saveBtn.style.borderRadius = '12px';
+    saveBtn.style.cursor = 'pointer';
+    saveBtn.onclick = () => {
+      const topic = prompt('Topic for this note?') || 'General';
+      Notes.add(content, topic);
+      saveBtn.textContent = '✓ Saved';
+      saveBtn.style.background = 'var(--good)';
+      setTimeout(() => {
+        saveBtn.textContent = '💾 Save';
+        saveBtn.style.background = 'var(--heart-dim)';
+      }, 2000);
+    };
+    wrap.appendChild(saveBtn);
+  }
+
   chatEl.appendChild(wrap);
   chatEl.scrollTop = chatEl.scrollHeight;
 }
@@ -285,7 +315,6 @@ async function pollMood() {
   moodPollTimer = setTimeout(pollMood, 1200);
 }
 
-// ---------------- Voice toggle ----------------
 Voice.setCallbacks(
   () => avatarEl.classList.add('speaking'),
   () => avatarEl.classList.remove('speaking')
@@ -295,13 +324,6 @@ voiceToggleBtn.addEventListener('click', () => {
   const on = Voice.toggle();
   voiceToggleBtn.textContent = on ? '🔊' : '🔇';
 });
-// ---- Notes management ----
-const notesToggleBtn = document.getElementById('notesToggleBtn');
-const notesSection = document.getElementById('notesSection');
-const notesNewBtn = document.getElementById('notesNewBtn');
-const notesSearch = document.getElementById('notesSearch');
-const notesList = document.getElementById('notesList');
-let notesMode = false;
 
 Notes.load();
 
@@ -350,7 +372,6 @@ function renderNotesList() {
   });
 }
 
-
 window.editNote = (id) => {
   const note = Notes.getAll().find(n => n.id === id);
   if (!note) return;
@@ -368,39 +389,5 @@ window.deleteNote = (id) => {
     renderNotesList();
   }
 };
-
-// Add save button to assistant messages
-const originalRenderMessage = renderMessage;
-renderMessage = function(role, content, ts, isError) {
-  originalRenderMessage(role, content, ts, isError);
-  if (role === 'assistant' && !isError) {
-    const lastMsg = chatEl.lastChild;
-    const bubble = lastMsg.querySelector('.msg');
-    const saveBtn = document.createElement('button');
-    saveBtn.className = 'note-save-btn';
-    saveBtn.textContent = '💾 Save';
-    saveBtn.style.marginTop = '8px';
-    saveBtn.style.fontSize = '12px';
-    saveBtn.style.padding = '4px 8px';
-    saveBtn.style.background = 'var(--heart-dim)';
-    saveBtn.style.border = 'none';
-    saveBtn.style.color = '#fff';
-    saveBtn.style.borderRadius = '12px';
-    saveBtn.style.cursor = 'pointer';
-    saveBtn.onclick = () => {
-      const topic = prompt('Topic for this note?') || 'General';
-      Notes.add(content, topic);
-      saveBtn.textContent = '✓ Saved';
-      saveBtn.style.background = 'var(--good)';
-      setTimeout(() => {
-        saveBtn.textContent = '💾 Save';
-        saveBtn.style.background = 'var(--heart-dim)';
-      }, 2000);
-    };
-    bubble.parentElement.appendChild(saveBtn);
-  }
-};
-
-boot();
 
 boot();
