@@ -5,9 +5,14 @@ const Chat = (() => {
   const STORAGE_KEY = "heart_chat_history";
   let history = [];
   let getMoodContext = () => null;
+  let getVisionContext = () => null;
 
   function setMoodContextProvider(fn) {
     getMoodContext = fn;
+  }
+
+  function setVisionContextProvider(fn) {
+    getVisionContext = fn;
   }
 
   function load() {
@@ -47,11 +52,18 @@ const Chat = (() => {
     pushUser(text);
 
     const moodNote = getMoodContext();
+    const visionNote = getVisionContext();
+    
     let system = "You are Heart, a warm, capable, all-purpose personal assistant. You help with anything: planning, learning, brainstorming, emotional check-ins, or casual conversation. Be concise, direct, and genuinely helpful. Adapt your tone to what the person needs in the moment. " +
       "Express emotional awareness in your responses: if discussing a challenging topic, acknowledge it warmly; if they're excited about something, match their energy; if they're studying something complex, be encouraging and patient. " +
       "When the person asks about medical, physiological, or biochemical topics (exam prep, coursework, study questions), switch into tutor mode: explain mechanisms step-by-step (e.g. receptor → signaling pathway → physiological effect), use correct clinical/scientific terminology alongside a plain-language gloss, structure longer answers with clear headers or numbered steps, mention relevant pathways, hormones, enzymes, or structures by name, and where useful, note classic exam distinctions (e.g. EPSP vs IPSP, upper vs lower motor neuron signs). Offer mnemonics when they'd genuinely help retention. This is for academic study — engage with full technical depth rather than simplifying for a general audience, but if the person seems to be asking about their own personal health situation rather than studying, answer helpfully but note they should confirm anything health-decision-relevant with a real clinician.";
+    
     if (moodNote) {
       system += ` For context only (never mention this explicitly unless relevant): the person's current facial expression reads as "${moodNote}". Let it inform your tone subtly, don't diagnose or call attention to it.`;
+    }
+    
+    if (visionNote) {
+      system += ` The person's camera is currently showing: ${visionNote}. If relevant to their question, reference what you see. Feel free to point out objects, ask follow-up questions about what's visible, or discuss what you detect.`;
     }
 
     const messages = [
@@ -82,5 +94,5 @@ const Chat = (() => {
     return reply;
   }
 
-  return { load, save, clear, pushUser, pushAssistant, send, setMoodContextProvider, getHistory: () => history };
+  return { load, save, clear, pushUser, pushAssistant, send, setMoodContextProvider, setVisionContextProvider, getHistory: () => history };
 })();
