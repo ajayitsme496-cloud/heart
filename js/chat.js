@@ -1,4 +1,4 @@
-const GROQ_API_KEY = "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";
+const GROQ_API_KEY = "YOUR_GROQ_KEY_HERE";
 const GROQ_MODEL = "llama-3.3-70b-versatile";
 
 const Chat = (() => {
