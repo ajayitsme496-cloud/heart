@@ -297,3 +297,109 @@ voiceToggleBtn.addEventListener('click', () => {
 });
 
 boot();
+// ---- Notes management ----
+const notesToggleBtn = document.getElementById('notesToggleBtn');
+const notesSection = document.getElementById('notesSection');
+const notesNewBtn = document.getElementById('notesNewBtn');
+const notesSearch = document.getElementById('notesSearch');
+const notesList = document.getElementById('notesList');
+let notesMode = false;
+
+Notes.load();
+
+notesToggleBtn.addEventListener('click', () => {
+  notesMode = !notesMode;
+  notesToggleBtn.classList.toggle('active', notesMode);
+  chatEl.style.display = notesMode ? 'none' : 'flex';
+  notesSection.style.display = notesMode ? 'flex' : 'none';
+  if (notesMode) renderNotesList();
+});
+
+notesNewBtn.addEventListener('click', () => {
+  const topic = prompt('Topic (e.g. Physiology, Biochem):') || 'General';
+  const text = prompt('Note text:');
+  if (text) {
+    Notes.add(text, topic);
+    renderNotesList();
+  }
+});
+
+notesSearch.addEventListener('input', () => renderNotesList());
+
+function renderNotesList() {
+  const query = notesSearch.value;
+  const notes = Notes.search(query);
+  notesList.innerHTML = '';
+  if (!notes.length) {
+    notesList.innerHTML = '<p style="color: var(--text-dim); padding: 16px; text-align: center;">No notes yet</p>';
+    return;
+  }
+  notes.forEach(note => {
+    const noteEl = document.createElement('div');
+    noteEl.className = 'note-item';
+    noteEl.innerHTML = `
+      <div class="note-header">
+        <span class="note-topic">${note.topic}</span>
+        <span class="note-date">${note.createdAt}</span>
+      </div>
+      <div class="note-text">${note.text.substring(0, 150)}${note.text.length > 150 ? '...' : ''}</div>
+      <div class="note-actions">
+        <button onclick="editNote(${note.id})">Edit</button>
+        <button onclick="deleteNote(${note.id})">Delete</button>
+      </div>
+    `;
+    notesList.appendChild(noteEl);
+  });
+}
+
+window.editNote = (id) => {
+  const note = Notes.getAll().find(n => n.id === id);
+  if (!note) return;
+  const newTopic = prompt('Topic:', note.topic) || note.topic;
+  const newText = prompt('Note text:', note.text);
+  if (newText) {
+    Notes.update(id, newText, newTopic);
+    renderNotesList();
+  }
+};
+
+window.deleteNote = (id) => {
+  if (confirm('Delete this note?')) {
+    Notes.remove(id);
+    renderNotesList();
+  }
+};
+
+// Add save button to assistant messages
+const originalRenderMessage = renderMessage;
+renderMessage = function(role, content, ts, isError) {
+  originalRenderMessage(role, content, ts, isError);
+  if (role === 'assistant' && !isError) {
+    const lastMsg = chatEl.lastChild;
+    const bubble = lastMsg.querySelector('.msg');
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'note-save-btn';
+    saveBtn.textContent = '💾 Save';
+    saveBtn.style.marginTop = '8px';
+    saveBtn.style.fontSize = '12px';
+    saveBtn.style.padding = '4px 8px';
+    saveBtn.style.background = 'var(--heart-dim)';
+    saveBtn.style.border = 'none';
+    saveBtn.style.color = '#fff';
+    saveBtn.style.borderRadius = '12px';
+    saveBtn.style.cursor = 'pointer';
+    saveBtn.onclick = () => {
+      const topic = prompt('Topic for this note?') || 'General';
+      Notes.add(content, topic);
+      saveBtn.textContent = '✓ Saved';
+      saveBtn.style.background = 'var(--good)';
+      setTimeout(() => {
+        saveBtn.textContent = '💾 Save';
+        saveBtn.style.background = 'var(--heart-dim)';
+      }, 2000);
+    };
+    bubble.parentElement.appendChild(saveBtn);
+  }
+};
+
+boot();
