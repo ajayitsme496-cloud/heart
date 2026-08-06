@@ -1,5 +1,3 @@
-// notes.js — save and organize study notes
-
 const Notes = (() => {
   const STORAGE_KEY = "heart_study_notes";
   let allNotes = [];
