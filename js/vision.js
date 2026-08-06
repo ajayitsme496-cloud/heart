@@ -1,39 +1,63 @@
-const Voice = (() => {
-  let enabled = true;
-  let onSpeakStart = () => {};
-  let onSpeakEnd = () => {};
+const Vision = (() => {
+  let model = null;
+  let isDetecting = false;
+  let detectedObjects = [];
+  let detectionCallback = () => {};
 
-  function setCallbacks(startFn, endFn) {
-    onSpeakStart = startFn;
-    onSpeakEnd = endFn;
+  async function loadModel() {
+    if (model) return true;
+    try {
+      if (typeof cocoSsd === 'undefined') {
+        console.warn("COCO-SSD not loaded yet, skipping vision");
+        return false;
+      }
+      model = await cocoSsd.load();
+      console.log("Vision model loaded successfully");
+      return true;
+    } catch (e) {
+      console.warn("Vision model skipped (optional feature):", e.message);
+      return false;
+    }
   }
 
-  function toggle() {
-    enabled = !enabled;
-    if (!enabled) window.speechSynthesis.cancel();
-    return enabled;
+  function setDetectionCallback(fn) {
+    detectionCallback = fn;
   }
 
-  function isEnabled() {
-    return enabled;
+  async function detectFromVideo(video) {
+    if (!model || !video) return [];
+    try {
+      if (video.readyState !== video.HAVE_ENOUGH_DATA) return [];
+      const predictions = await model.estimateObjects(video, false);
+      detectedObjects = predictions
+        .filter(p => p.score > 0.4)
+        .map(p => p.class)
+        .slice(0, 5);
+      if (detectionCallback) detectionCallback(detectedObjects);
+      return detectedObjects;
+    } catch (e) {
+      return [];
+    }
   }
 
-  function speak(text) {
-    if (!enabled || !window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 1.0;
-    utterance.pitch = 1.05;
-    utterance.onstart = () => onSpeakStart();
-    utterance.onend = () => onSpeakEnd();
-    utterance.onerror = () => onSpeakEnd();
-    window.speechSynthesis.speak(utterance);
+  function getDetected() {
+    return detectedObjects;
   }
 
-  function stop() {
-    window.speechSynthesis.cancel();
-    onSpeakEnd();
+  function startDetection(video, intervalMs = 2000) {
+    if (!model) return;
+    isDetecting = true;
+    const loop = async () => {
+      if (!isDetecting || !video) return;
+      await detectFromVideo(video);
+      setTimeout(loop, intervalMs);
+    };
+    loop();
   }
 
-  return { speak, stop, toggle, isEnabled, setCallbacks };
+  function stopDetection() {
+    isDetecting = false;
+  }
+
+  return { loadModel, detectFromVideo, setDetectionCallback, getDetected, startDetection, stopDetection };
 })();
