@@ -5,14 +5,14 @@ const Chat = (() => {
   const STORAGE_KEY = "heart_chat_history";
   let history = [];
   let getMoodContext = () => null;
-  let getVisionContext = () => null;
+  let getImageContext = () => null;
 
   function setMoodContextProvider(fn) {
     getMoodContext = fn;
   }
 
-  function setVisionContextProvider(fn) {
-    getVisionContext = fn;
+  function setImageContextProvider(fn) {
+    getImageContext = fn;
   }
 
   function load() {
@@ -52,7 +52,7 @@ const Chat = (() => {
     pushUser(text);
 
     const moodNote = getMoodContext();
-    const visionNote = getVisionContext();
+    const imageNote = getImageContext();
     
     let system = "You are Heart, a warm, capable, all-purpose personal assistant. You help with anything: planning, learning, brainstorming, emotional check-ins, or casual conversation. Be concise, direct, and genuinely helpful. Adapt your tone to what the person needs in the moment. " +
       "Express emotional awareness in your responses: if discussing a challenging topic, acknowledge it warmly; if they're excited about something, match their energy; if they're studying something complex, be encouraging and patient. " +
@@ -62,8 +62,8 @@ const Chat = (() => {
       system += ` For context only (never mention this explicitly unless relevant): the person's current facial expression reads as "${moodNote}". Let it inform your tone subtly, don't diagnose or call attention to it.`;
     }
     
-    if (visionNote) {
-      system += ` The person's camera is currently showing: ${visionNote}. If relevant to their question, reference what you see. Feel free to point out objects, ask follow-up questions about what's visible, or discuss what you detect.`;
+    if (imageNote) {
+      system += ` The person just uploaded an image. It appears to contain: ${imageNote}. Reference this in your response and help them understand, identify, or learn about what's in it.`;
     }
 
     const messages = [
@@ -94,5 +94,5 @@ const Chat = (() => {
     return reply;
   }
 
-  return { load, save, clear, pushUser, pushAssistant, send, setMoodContextProvider, setVisionContextProvider, getHistory: () => history };
+  return { load, save, clear, pushUser, pushAssistant, send, setMoodContextProvider, setImageContextProvider, getHistory: () => history };
 })();
