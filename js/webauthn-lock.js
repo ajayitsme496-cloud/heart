@@ -5,6 +5,10 @@ const WebAuthnLock = (() => {
     return window.PublicKeyCredential !== undefined && navigator.credentials !== undefined;
   }
 
+  function hasEnrollment() {
+    return localStorage.getItem(CREDENTIAL_ID_KEY) !== null;
+  }
+
   async function enroll() {
     if (!supported()) throw new Error("WebAuthn not supported");
     const options = {
@@ -49,5 +53,5 @@ const WebAuthnLock = (() => {
     }
   }
 
-  return { supported, enroll, unlock };
+  return { supported, hasEnrollment, enroll, unlock };
 })();
