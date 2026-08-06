@@ -5,11 +5,17 @@ const Vision = (() => {
   let detectionCallback = () => {};
 
   async function loadModel() {
+    if (model) return true;
     try {
+      if (typeof cocoSsd === 'undefined') {
+        console.warn("COCO-SSD not loaded yet, skipping vision");
+        return false;
+      }
       model = await cocoSsd.load();
+      console.log("Vision model loaded successfully");
       return true;
     } catch (e) {
-      console.error("Failed to load COCO-SSD model:", e);
+      console.warn("Vision model skipped (optional feature):", e.message);
       return false;
     }
   }
@@ -19,34 +25,15 @@ const Vision = (() => {
   }
 
   async function detectFromVideo(video) {
-    if (!model || !video || video.paused) return [];
+    if (!model || !video) return [];
     try {
-      const predictions = await model.estimateObjects(video);
+      if (video.readyState !== video.HAVE_ENOUGH_DATA) return [];
+      const predictions = await model.estimateObjects(video, false);
       detectedObjects = predictions
-        .filter(p => p.score > 0.5)
+        .filter(p => p.score > 0.4)
         .map(p => p.class)
-        .slice(0, 8);
-      detectionCallback(detectedObjects);
-      return detectedObjects;
-    } catch (e) {
-      return [];
-    }
-  }
-
-  async function detectFromImage(imageSrc) {
-    if (!model) return [];
-    try {
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-      img.onload = async () => {
-        const predictions = await model.estimateObjects(img);
-        detectedObjects = predictions
-          .filter(p => p.score > 0.5)
-          .map(p => p.class)
-          .slice(0, 8);
-        detectionCallback(detectedObjects);
-      };
-      img.src = imageSrc;
+        .slice(0, 5);
+      if (detectionCallback) detectionCallback(detectedObjects);
       return detectedObjects;
     } catch (e) {
       return [];
@@ -57,10 +44,11 @@ const Vision = (() => {
     return detectedObjects;
   }
 
-  function startDetection(video, intervalMs = 1500) {
+  function startDetection(video, intervalMs = 2000) {
+    if (!model) return;
     isDetecting = true;
     const loop = async () => {
-      if (!isDetecting) return;
+      if (!isDetecting || !video) return;
       await detectFromVideo(video);
       setTimeout(loop, intervalMs);
     };
@@ -71,5 +59,12 @@ const Vision = (() => {
     isDetecting = false;
   }
 
-  return { loadModel, detectFromVideo, detectFromImage, setDetectionCallback, getDetected, startDetection, stopDetection };
+  return { 
+    loadModel, 
+    detectFromVideo, 
+    setDetectionCallback, 
+    getDetected, 
+    startDetection, 
+    stopDetection 
+  };
 })();
