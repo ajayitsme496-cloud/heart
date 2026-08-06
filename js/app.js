@@ -30,6 +30,7 @@ const moodLabel = document.getElementById('moodLabel');
 const moodDot = document.getElementById('moodDot');
 const avatarEl = document.getElementById('avatar');
 const voiceToggleBtn = document.getElementById('voiceToggleBtn');
+const imageUploadBtn = document.getElementById('imageUploadBtn');
 const notesToggleBtn = document.getElementById('notesToggleBtn');
 const notesSection = document.getElementById('notesSection');
 const notesNewBtn = document.getElementById('notesNewBtn');
@@ -37,22 +38,17 @@ const notesSearch = document.getElementById('notesSearch');
 const notesList = document.getElementById('notesList');
 
 let currentMood = null;
-let currentObjects = [];
+let currentImageCaption = null;
 let moodPollTimer = null;
 let livenessOn = false;
 let notesMode = false;
-let visionReady = false;
 
 function showScreen(el) {
   [setupScreen, lockScreen, enrollScreen, mainScreen].forEach(s => s.style.display = 'none');
   el.style.display = 'flex';
 }
 
-async function boot() {
-  await Vision.loadModel().then(ok => {
-    if (ok) visionReady = true;
-  });
-  
+function boot() {
   if (!WebAuthnLock.supported()) {
     proceedToFaceEnrollOrMain();
     return;
@@ -140,7 +136,7 @@ function startMain() {
   Chat.load().forEach(m => renderMessage(m.role, m.content, m.ts));
   if (Chat.getHistory().length) emptyState.style.display = 'none';
   Chat.setMoodContextProvider(() => currentMood);
-  Chat.setVisionContextProvider(() => currentObjects.length ? currentObjects.join(', ') : null);
+  Chat.setImageContextProvider(() => currentImageCaption);
 }
 
 function fmtTime(ts) {
@@ -273,12 +269,6 @@ cameraToggleBtn.addEventListener('click', async () => {
       await FaceEngine.loadModels();
       await FaceEngine.startCamera(liveVideo);
       pollMood();
-      if (visionReady) {
-        Vision.setDetectionCallback((objects) => {
-          currentObjects = objects;
-        });
-        Vision.startDetection(liveVideo, 1500);
-      }
     } catch (e) {
       moodLabel.textContent = 'no camera';
       livenessOn = false;
@@ -289,13 +279,11 @@ cameraToggleBtn.addEventListener('click', async () => {
     FaceEngine.stopCamera(liveVideo);
     miniCameraWrap.style.display = 'none';
     currentMood = null;
-    currentObjects = [];
     moodDot.className = 'status-dot';
     moodDot.title = 'No face detected';
     avatarEl.classList.remove('happy', 'sad', 'angry', 'fearful', 'disgusted', 'thinking', 'neutral');
     avatarEl.classList.add('neutral');
     clearTimeout(moodPollTimer);
-    Vision.stopDetection();
   }
 });
 
@@ -348,6 +336,47 @@ Voice.setCallbacks(
 voiceToggleBtn.addEventListener('click', () => {
   const on = Voice.toggle();
   voiceToggleBtn.textContent = on ? '🔊' : '🔇';
+});
+
+imageUploadBtn.addEventListener('click', () => {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    setThinking(true);
+    const caption = await ImageAnalysis.analyzeImage(file);
+    currentImageCaption = caption;
+    setThinking(false);
+    
+    const imgPreview = document.createElement('div');
+    imgPreview.style.marginBottom = '8px';
+    const img = document.createElement('img');
+    img.src = ImageAnalysis.getCurrentImage();
+    img.style.maxWidth = '200px';
+    img.style.borderRadius = '8px';
+    img.style.display = 'block';
+    img.style.marginBottom = '6px';
+    imgPreview.appendChild(img);
+    
+    const captionEl = document.createElement('div');
+    captionEl.style.fontSize = '12px';
+    captionEl.style.color = 'var(--text-mid)';
+    captionEl.style.marginBottom = '8px';
+    captionEl.textContent = 'Detected: ' + caption;
+    imgPreview.appendChild(captionEl);
+    
+    chatEl.appendChild(imgPreview);
+    chatEl.scrollTop = chatEl.scrollHeight;
+    
+    const prompt = `I just uploaded this image. Here's what I see in it: "${caption}". Can you tell me more about this or help me identify it?`;
+    textInput.value = prompt;
+    textInput.dispatchEvent(new Event('input'));
+    textInput.focus();
+  };
+  input.click();
 });
 
 Notes.load();
