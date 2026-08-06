@@ -1,5 +1,3 @@
-// voice.js — text-to-speech using the browser's built-in speech synthesis (free, on-device)
-
 const Voice = (() => {
   let enabled = true;
   let onSpeakStart = () => {};
@@ -22,7 +20,7 @@ const Voice = (() => {
 
   function speak(text) {
     if (!enabled || !window.speechSynthesis) return;
-    window.speechSynthesis.cancel(); // stop any previous speech
+    window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.rate = 1.0;
     utterance.pitch = 1.05;
