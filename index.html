@@ -75,6 +75,7 @@
         <button class="icon-only-btn" id="voiceToggleBtn" title="Toggle voice">🔊</button>
         <button class="icon-only-btn" id="imageUploadBtn" title="Upload image">🖼️</button>
         <button class="icon-only-btn" id="notesToggleBtn" title="View notes">📝</button>
+        <button class="icon-only-btn" id="chatsToggleBtn" title="View chats">💬</button>
         <button class="clear-btn" id="clearBtn">Clear</button>
       </div>
     </header>
@@ -90,6 +91,13 @@
       </svg>
     </div>
 
+    <div id="chatsSection" class="notes-section" style="display:none;">
+  <div class="notes-header">
+    <input type="text" id="chatsSearch" placeholder="Search chats..." class="notes-search">
+    <button id="newChatBtn" class="primary-btn">+ New Chat</button>
+  </div>
+  <div id="chatsList" class="notes-list"></div>
+</div>
     <div id="notesSection" class="notes-section" style="display:none;">
       <div class="notes-header">
         <input type="text" id="notesSearch" placeholder="Search notes..." class="notes-search">
