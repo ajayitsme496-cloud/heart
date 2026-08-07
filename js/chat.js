@@ -95,7 +95,8 @@ const Chat = (() => {
     }
 
     const data = await response.json();
-    const reply = data.choices?.[0]?.message?.content?.trim() || "I didn't quite catch that — could you try again?";
+    let reply = data.choices?.[0]?.message?.content?.trim() || "I didn't quite catch that — could you try again?";
+    reply = reply.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
     pushAssistant(reply);
     return reply;
   }
