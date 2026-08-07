@@ -459,4 +459,80 @@ window.deleteNote = (id) => {
 };
 
 chatsToggleBtn.addEventListener('click', () => {
-  chatsMode = !chatsM
+  chatsMode = !chatsMode;
+  notesMode = false;
+  notesSection.style.display = 'none';
+  notesToggleBtn.classList.remove('active');
+  chatsToggleBtn.classList.toggle('active', chatsMode);
+  chatEl.style.display = chatsMode ? 'none' : 'flex';
+  chatsSection.style.display = chatsMode ? 'flex' : 'none';
+  if (chatsMode) renderChatsList();
+});
+
+newChatBtn.addEventListener('click', () => {
+  Chat.newChat();
+  chatsMode = false;
+  chatsSection.style.display = 'none';
+  chatsToggleBtn.classList.remove('active');
+  chatEl.style.display = 'flex';
+  renderActiveChat();
+});
+
+chatsSearch.addEventListener('input', () => renderChatsList());
+
+function renderChatsList() {
+  const query = chatsSearch.value;
+  const chats = Chat.listChats(query);
+  const activeId = Chat.getActiveChatId();
+  chatsList.innerHTML = '';
+  if (!chats.length) {
+    chatsList.innerHTML = '<p style="color: var(--text-dim); padding: 16px; text-align: center;">No chats yet</p>';
+    return;
+  }
+  chats.forEach(chat => {
+    const lastMsg = chat.messages[chat.messages.length - 1];
+    const preview = lastMsg ? lastMsg.content.substring(0, 90) : 'No messages yet';
+    const chatItem = document.createElement('div');
+    chatItem.className = 'note-item';
+    if (chat.id === activeId) chatItem.style.borderColor = 'var(--heart)';
+    chatItem.innerHTML = `
+      <div class="note-header">
+        <span class="note-topic">${chat.title}${chat.id === activeId ? ' • current' : ''}</span>
+        <span class="note-date">${new Date(chat.updatedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
+      </div>
+      <div class="note-text">${preview}${preview.length >= 90 ? '...' : ''}</div>
+      <div class="note-actions">
+        <button data-action="open">Open</button>
+        <button data-action="rename">Rename</button>
+        <button data-action="delete">Delete</button>
+      </div>
+    `;
+    chatItem.querySelector('[data-action="open"]').onclick = () => {
+      Chat.switchChat(chat.id);
+      chatsMode = false;
+      chatsSection.style.display = 'none';
+      chatsToggleBtn.classList.remove('active');
+      chatEl.style.display = 'flex';
+      renderActiveChat();
+    };
+    chatItem.querySelector('[data-action="rename"]').onclick = (e) => {
+      e.stopPropagation();
+      const newTitle = prompt('Rename chat:', chat.title);
+      if (newTitle) {
+        Chat.renameChat(chat.id, newTitle);
+        renderChatsList();
+      }
+    };
+    chatItem.querySelector('[data-action="delete"]').onclick = (e) => {
+      e.stopPropagation();
+      if (confirm('Delete this chat permanently?')) {
+        Chat.deleteChat(chat.id);
+        renderChatsList();
+        renderActiveChat();
+      }
+    };
+    chatsList.appendChild(chatItem);
+  });
+}
+
+boot();
