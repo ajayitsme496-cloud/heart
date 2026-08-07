@@ -75,6 +75,7 @@
         </button>
         <button class="icon-only-btn" id="voiceToggleBtn" title="Toggle voice">🔊</button>
         <button class="icon-only-btn" id="imageUploadBtn" title="Upload image">🖼️</button>
+        <button class="icon-only-btn" id="pdfUploadBtn" title="Upload PDF">📄</button>
         <button class="icon-only-btn" id="chatsToggleBtn" title="View chats">💬</button>
         <button class="icon-only-btn" id="notesToggleBtn" title="View notes">📝</button>
         <button class="clear-btn" id="clearBtn">Clear</button>
@@ -136,6 +137,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
 <script src="js/webauthn-lock.js"></script>
 <script src="js/voice.js"></script>
@@ -168,5 +170,108 @@ const TextEmotion = (() => {
 </script>
 
 <script src="js/app.js"></script>
+<script src="js/app.js"></script>
+  <script>
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+
+document.getElementById('pdfUploadBtn').addEventListener('click', () => {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'application/pdf';
+  input.onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    await handlePdfUpload(file);
+  };
+  input.click();
+});
+
+async function extractPdfText(file) {
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  let fullText = '';
+  const maxPages = Math.min(pdf.numPages, 40);
+  for (let i = 1; i <= maxPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const pageText = content.items.map(item => item.str).join(' ');
+    fullText += pageText + '\n\n';
+    if (fullText.length > 24000) break;
+  }
+  const truncated = pdf.numPages > maxPages || fullText.length > 24000;
+  return { text: fullText.slice(0, 24000), truncated, totalPages: pdf.numPages };
+}
+
+async function handlePdfUpload(file) {
+  renderMessage('user', `📄 Uploaded: ${file.name}`, Date.now());
+  setThinking(true);
+  try {
+    const { text, truncated, totalPages } = await extractPdfText(file);
+    if (!text.trim()) {
+      renderMessage('assistant', "I couldn't find readable text in this PDF — it might be a scanned image rather than text. Try a text-based PDF instead.", Date.now(), true);
+      setThinking(false);
+      return;
+    }
+
+    const systemPrompt = "You are an expert academic note-maker. You will receive raw extracted text from a PDF document (may include messy spacing or artifacts from extraction — ignore formatting noise and focus on content). " +
+      "Analyze it thoroughly and produce well-organized, sorted study notes. " +
+      "Respond with ONLY valid JSON, no markdown fences, no commentary, in exactly this shape: " +
+      '{"topic":"short 2-4 word subject name","sections":[{"heading":"short heading","content":"clear, well-structured note content for this section, using correct terminology, in your own words"}]}' +
+      " Sort content into logical sections by subtopic, not by page order. Aim for 3-8 sections depending on content density. Be thorough — a student should be able to study from these notes alone.";
+
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${GROQ_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: GROQ_MODEL,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: text }
+        ]
+      })
+    });
+
+    if (!response.ok) throw new Error("API error " + response.status);
+
+    const data = await response.json();
+    let raw = data.choices?.[0]?.message?.content?.trim() || "";
+    raw = raw.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+    raw = raw.replace(/^```json\s*/i, '').replace(/```$/, '').trim();
+
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (err) {
+      renderMessage('assistant', "I analyzed the PDF but had trouble structuring it neatly. Here's what I found:\n\n" + raw, Date.now());
+      setThinking(false);
+      return;
+    }
+
+    const topic = parsed.topic || file.name.replace('.pdf', '');
+    let summaryMd = `### 📄 Notes from "${file.name}"\n\n`;
+    if (truncated) {
+      summaryMd += `_This PDF has ${totalPages} pages — I analyzed as much as fits in one pass. For very long documents, consider uploading in parts._\n\n`;
+    }
+    summaryMd += `Organized into **${parsed.sections.length}** sections under **${topic}**, saved to your Notes:\n\n`;
+
+    parsed.sections.forEach(section => {
+      Notes.add(`${section.heading}\n\n${section.content}`, topic);
+      summaryMd += `- **${section.heading}**\n`;
+    });
+
+    summaryMd += `\nTap the 📝 Notes tab to review, edit, or study from them anytime.`;
+
+    renderMessage('assistant', summaryMd, Date.now());
+    Voice.speak(`I've organized your PDF into ${parsed.sections.length} sections of notes under ${topic}.`);
+  } catch (err) {
+    renderMessage('assistant', 'Something went wrong analyzing the PDF. Try again, or try a smaller file.', Date.now(), true);
+  } finally {
+    setThinking(false);
+  }
+}
+</script>
 </body>
 </html>
