@@ -2,7 +2,10 @@ const GROQ_API_KEY = "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";
 const GROQ_MODEL = "qwen/qwen3.6-27b";
 
 const Chat = (() => {
-  const STORAGE_KEY = "heart_chat_history";
+  const CHATS_KEY = "heart_all_chats";
+  const ACTIVE_KEY = "heart_active_chat_id";
+  let allChats = [];
+  let activeChatId = null;
   let history = [];
   let getMoodContext = () => null;
 
@@ -10,23 +13,126 @@ const Chat = (() => {
     getMoodContext = fn;
   }
 
-  function load() {
+  function loadAllChats() {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      history = raw ? JSON.parse(raw) : [];
+      const raw = localStorage.getItem(CHATS_KEY);
+      allChats = raw ? JSON.parse(raw) : [];
     } catch (e) {
-      history = [];
+      allChats = [];
     }
+    return allChats;
+  }
+
+  function persistAllChats() {
+    localStorage.setItem(CHATS_KEY, JSON.stringify(allChats));
+  }
+
+  function makeTitle(firstMessage) {
+    if (!firstMessage) return "New chat";
+    const trimmed = firstMessage.trim().replace(/\s+/g, ' ');
+    return trimmed.length > 42 ? trimmed.slice(0, 42) + '…' : trimmed;
+  }
+
+  function load() {
+    loadAllChats();
+    activeChatId = localStorage.getItem(ACTIVE_KEY);
+    let active = allChats.find(c => c.id === activeChatId);
+    if (!active) {
+      if (allChats.length) {
+        active = allChats[0];
+        activeChatId = active.id;
+      } else {
+        active = createChatObject();
+        allChats.unshift(active);
+        activeChatId = active.id;
+        persistAllChats();
+      }
+      localStorage.setItem(ACTIVE_KEY, activeChatId);
+    }
+    history = active.messages;
     return history;
   }
 
+  function createChatObject() {
+    return {
+      id: 'chat_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+      title: "New chat",
+      messages: [],
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
+  }
+
   function save() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+    const active = allChats.find(c => c.id === activeChatId);
+    if (!active) return;
+    active.messages = history;
+    active.updatedAt = Date.now();
+    if (active.title === "New chat" && history.length) {
+      const firstUser = history.find(m => m.role === 'user');
+      if (firstUser) active.title = makeTitle(firstUser.content);
+    }
+    persistAllChats();
   }
 
   function clear() {
     history = [];
     save();
+  }
+
+  function newChat() {
+    const chat = createChatObject();
+    allChats.unshift(chat);
+    activeChatId = chat.id;
+    history = chat.messages;
+    localStorage.setItem(ACTIVE_KEY, activeChatId);
+    persistAllChats();
+    return history;
+  }
+
+  function switchChat(id) {
+    const chat = allChats.find(c => c.id === id);
+    if (!chat) return null;
+    activeChatId = id;
+    history = chat.messages;
+    localStorage.setItem(ACTIVE_KEY, activeChatId);
+    return history;
+  }
+
+  function deleteChat(id) {
+    allChats = allChats.filter(c => c.id !== id);
+    persistAllChats();
+    if (activeChatId === id) {
+      if (allChats.length) {
+        switchChat(allChats[0].id);
+      } else {
+        newChat();
+      }
+    }
+  }
+
+  function renameChat(id, newTitle) {
+    const chat = allChats.find(c => c.id === id);
+    if (chat && newTitle.trim()) {
+      chat.title = newTitle.trim();
+      persistAllChats();
+    }
+  }
+
+  function listChats(query) {
+    let list = [...allChats].sort((a, b) => b.updatedAt - a.updatedAt);
+    if (query && query.trim()) {
+      const q = query.toLowerCase();
+      list = list.filter(c =>
+        c.title.toLowerCase().includes(q) ||
+        c.messages.some(m => m.content.toLowerCase().includes(q))
+      );
+    }
+    return list;
+  }
+
+  function getActiveChatId() {
+    return activeChatId;
   }
 
   function pushUser(text) {
@@ -51,7 +157,7 @@ const Chat = (() => {
       "Express emotional awareness in your responses: if discussing a challenging topic, acknowledge it warmly; if they're excited about something, match their energy; if they're studying something complex, be encouraging and patient. " +
       "When the person asks about medical, physiological, or biochemical topics (exam prep, coursework, study questions), switch into tutor mode: explain mechanisms step-by-step (e.g. receptor → signaling pathway → physiological effect), use correct clinical/scientific terminology alongside a plain-language gloss, structure longer answers with clear headers or numbered steps, mention relevant pathways, hormones, enzymes, or structures by name, and where useful, note classic exam distinctions (e.g. EPSP vs IPSP, upper vs lower motor neuron signs). Offer mnemonics when they'd genuinely help retention. This is for academic study — engage with full technical depth rather than simplifying for a general audience, but if the person seems to be asking about their own personal health situation rather than studying, answer helpfully but note they should confirm anything health-decision-relevant with a real clinician. " +
       "If the person shares an image, actually look at it and describe what you genuinely see — objects, people, text, diagrams, anatomy, anything relevant — before answering their question about it.";
-    
+
     if (moodNote) {
       system += ` For context only (never mention this explicitly unless relevant): the person's current facial expression reads as "${moodNote}". Let it inform your tone subtly, don't diagnose or call attention to it.`;
     }
@@ -101,5 +207,9 @@ const Chat = (() => {
     return reply;
   }
 
-  return { load, save, clear, pushUser, pushAssistant, send, setMoodContextProvider, getHistory: () => history };
+  return {
+    load, save, clear, pushUser, pushAssistant, send, setMoodContextProvider,
+    getHistory: () => history,
+    newChat, switchChat, deleteChat, renameChat, listChats, getActiveChatId
+  };
 })();
