@@ -38,7 +38,6 @@ const notesSearch = document.getElementById('notesSearch');
 const notesList = document.getElementById('notesList');
 
 let currentMood = null;
-let currentImageCaption = null;
 let moodPollTimer = null;
 let livenessOn = false;
 let notesMode = false;
@@ -136,7 +135,6 @@ function startMain() {
   Chat.load().forEach(m => renderMessage(m.role, m.content, m.ts));
   if (Chat.getHistory().length) emptyState.style.display = 'none';
   Chat.setMoodContextProvider(() => currentMood);
-  Chat.setImageContextProvider(() => currentImageCaption);
 }
 
 function fmtTime(ts) {
@@ -346,35 +344,33 @@ imageUploadBtn.addEventListener('click', () => {
     const file = e.target.files[0];
     if (!file) return;
     
-    setThinking(true);
-    const caption = await ImageAnalysis.analyzeImage(file);
-    currentImageCaption = caption;
-    setThinking(false);
-    
-    const imgPreview = document.createElement('div');
-    imgPreview.style.marginBottom = '8px';
-    const img = document.createElement('img');
-    img.src = ImageAnalysis.getCurrentImage();
-    img.style.maxWidth = '200px';
-    img.style.borderRadius = '8px';
-    img.style.display = 'block';
-    img.style.marginBottom = '6px';
-    imgPreview.appendChild(img);
-    
-    const captionEl = document.createElement('div');
-    captionEl.style.fontSize = '12px';
-    captionEl.style.color = 'var(--text-mid)';
-    captionEl.style.marginBottom = '8px';
-    captionEl.textContent = 'Detected: ' + caption;
-    imgPreview.appendChild(captionEl);
-    
-    chatEl.appendChild(imgPreview);
-    chatEl.scrollTop = chatEl.scrollHeight;
-    
-    const prompt = `I just uploaded this image. Here's what I see in it: "${caption}". Can you tell me more about this or help me identify it?`;
-    textInput.value = prompt;
-    textInput.dispatchEvent(new Event('input'));
-    textInput.focus();
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      const base64 = ev.target.result;
+      
+      const imgPreview = document.createElement('div');
+      imgPreview.style.marginBottom = '8px';
+      const img = document.createElement('img');
+      img.src = base64;
+      img.style.maxWidth = '200px';
+      img.style.borderRadius = '8px';
+      img.style.display = 'block';
+      imgPreview.appendChild(img);
+      chatEl.appendChild(imgPreview);
+      chatEl.scrollTop = chatEl.scrollHeight;
+      
+      setThinking(true);
+      try {
+        const reply = await Chat.send("What do you see in this image? Please describe it and identify anything notable.", base64);
+        renderMessage('assistant', reply, Date.now());
+        Voice.speak(reply);
+      } catch (err) {
+        renderMessage('assistant', 'Something went wrong analyzing the image. Try again.', Date.now(), true);
+      } finally {
+        setThinking(false);
+      }
+    };
+    reader.readAsDataURL(file);
   };
   input.click();
 });
