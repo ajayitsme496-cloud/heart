@@ -12,9 +12,10 @@ const Chat = (() => {
 
   function setMoodContextProvider(fn) {
     getMoodContext = fn;
-    function setTextEmotionProvider(fn) {
-    getTextEmotion = fn;
   }
+
+  function setTextEmotionProvider(fn) {
+    getTextEmotion = fn;
   }
 
   function loadAllChats() {
@@ -154,6 +155,7 @@ const Chat = (() => {
   }
 
   async function send(text, imageBase64) {
+    const textEmotion = getTextEmotion ? getTextEmotion()(text) : null;
     pushUser(text);
 
     const moodNote = getMoodContext();
@@ -164,6 +166,9 @@ const Chat = (() => {
 
     if (moodNote) {
       system += ` For context only (never mention this explicitly unless relevant): the person's current facial expression reads as "${moodNote}". Let it inform your tone subtly, don't diagnose or call attention to it.`;
+    }
+    if (textEmotion) {
+      system += ` The way the person just wrote suggests they may be feeling ${textEmotion}. Respond with real attunement to this — validate the feeling naturally in your own words if it fits, without labeling it clinically or being heavy-handed. If they seem to be going through something significant, gently show you're paying attention rather than just answering the surface question.`;
     }
 
     const priorMessages = history.slice(0, -1).map(m => ({ role: m.role, content: m.content }));
@@ -212,7 +217,7 @@ const Chat = (() => {
   }
 
   return {
-    load, save, clear, pushUser, pushAssistant, send, setMoodContextProvider,
+    load, save, clear, pushUser, pushAssistant, send, setMoodContextProvider, setTextEmotionProvider,
     getHistory: () => history,
     newChat, switchChat, deleteChat, renameChat, listChats, getActiveChatId
   };
