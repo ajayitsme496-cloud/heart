@@ -140,6 +140,7 @@ function startMain() {
   showScreen(mainScreen);
   renderActiveChat();
   Chat.setMoodContextProvider(() => currentMood);
+  Chat.setTextEmotionProvider(() => TextEmotion.analyze);
 }
 
 function renderActiveChat() {
