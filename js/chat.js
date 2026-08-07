@@ -8,9 +8,13 @@ const Chat = (() => {
   let activeChatId = null;
   let history = [];
   let getMoodContext = () => null;
+  let getTextEmotion = () => null;
 
   function setMoodContextProvider(fn) {
     getMoodContext = fn;
+    function setTextEmotionProvider(fn) {
+    getTextEmotion = fn;
+  }
   }
 
   function loadAllChats() {
