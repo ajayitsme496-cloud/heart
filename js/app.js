@@ -165,7 +165,12 @@ function renderMessage(role, content, ts, isError) {
 
   const bubble = document.createElement('div');
   bubble.className = 'msg ' + (isError ? 'error' : role);
-  bubble.textContent = content;
+
+  if (role === 'assistant' && !isError && typeof marked !== 'undefined') {
+    bubble.innerHTML = marked.parse(content);
+  } else {
+    bubble.textContent = content;
+  }
 
   const time = document.createElement('div');
   time.className = 'timestamp' + (role === 'user' ? '' : ' left');
@@ -202,6 +207,7 @@ function renderMessage(role, content, ts, isError) {
   chatEl.appendChild(wrap);
   chatEl.scrollTop = chatEl.scrollHeight;
 }
+
 
 function setThinking(on) {
   pulseWrap.classList.toggle('active', on);
@@ -423,22 +429,58 @@ function renderNotesList() {
     notesList.innerHTML = '<p style="color: var(--text-dim); padding: 16px; text-align: center;">No notes yet</p>';
     return;
   }
+
+  const groups = {};
   notes.forEach(note => {
-    const noteEl = document.createElement('div');
-    noteEl.className = 'note-item';
-    noteEl.innerHTML = `
-      <div class="note-header">
-        <span class="note-topic">${note.topic}</span>
-        <span class="note-date">${note.createdAt}</span>
-      </div>
-      <div class="note-text">${note.text.substring(0, 150)}${note.text.length > 150 ? '...' : ''}</div>
-      <div class="note-actions">
-        <button onclick="editNote(${note.id})">Edit</button>
-        <button onclick="deleteNote(${note.id})">Delete</button>
+    if (!groups[note.topic]) groups[note.topic] = [];
+    groups[note.topic].push(note);
+  });
+
+  Object.keys(groups).sort().forEach(topic => {
+    const groupEl = document.createElement('div');
+    groupEl.className = 'note-group';
+
+    const header = document.createElement('div');
+    header.className = 'note-group-header';
+    header.innerHTML = `
+      <span class="note-group-title">${topic}</span>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span class="note-group-count">${groups[topic].length}</span>
+        <span class="note-group-arrow">▶</span>
       </div>
     `;
-    notesList.appendChild(noteEl);
+    header.addEventListener('click', () => {
+      groupEl.classList.toggle('open');
+    });
+
+    const itemsWrap = document.createElement('div');
+    itemsWrap.className = 'note-group-items';
+
+    groups[topic].forEach(note => {
+      const noteEl = document.createElement('div');
+      noteEl.className = 'note-item';
+      noteEl.innerHTML = `
+        <div class="note-header">
+          <span class="note-topic">${note.topic}</span>
+          <span class="note-date">${note.createdAt}</span>
+        </div>
+        <div class="note-text">${note.text.substring(0, 150)}${note.text.length > 150 ? '...' : ''}</div>
+        <div class="note-actions">
+          <button onclick="editNote(${note.id})">Edit</button>
+          <button onclick="deleteNote(${note.id})">Delete</button>
+        </div>
+      `;
+      itemsWrap.appendChild(noteEl);
+    });
+
+    groupEl.appendChild(header);
+    groupEl.appendChild(itemsWrap);
+    notesList.appendChild(groupEl);
   });
+
+  if (query && query.trim()) {
+    document.querySelectorAll('.note-group').forEach(g => g.classList.add('open'));
+  }
 }
 
 window.editNote = (id) => {
