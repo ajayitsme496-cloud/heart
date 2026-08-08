@@ -138,6 +138,35 @@ const Chat = (() => {
 
   function getActiveChatId() {
     return activeChatId;
+    function buildMemoryContext(currentQuery) {
+    const otherChats = allChats.filter(c => c.id !== activeChatId && c.messages.length);
+    if (!otherChats.length) return null;
+
+    const topicIndex = otherChats
+      .slice(0, 12)
+      .map(c => `"${c.title}"`)
+      .join(', ');
+
+    const queryWords = currentQuery.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+    let relevantSnippets = [];
+
+    otherChats.forEach(chat => {
+      chat.messages.forEach(m => {
+        const lower = m.content.toLowerCase();
+        const matches = queryWords.some(w => lower.includes(w));
+        if (matches && relevantSnippets.length < 4) {
+          const snippet = m.content.length > 180 ? m.content.slice(0, 180) + '…' : m.content;
+          relevantSnippets.push(`From "${chat.title}": ${snippet}`);
+        }
+      });
+    });
+
+    let context = `The person has other past chats with you, including: ${topicIndex}.`;
+    if (relevantSnippets.length) {
+      context += ` A few things from past chats that may be relevant right now:\n${relevantSnippets.join('\n')}`;
+    }
+    return context;
+  }
   }
 
   function pushUser(text) {
