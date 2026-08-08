@@ -273,12 +273,12 @@ async function handleDocumentUpload(file) {
       return;
     }
 
-    const systemPrompt = "You are an expert academic note-maker. You will receive raw extracted text from a document (may include messy spacing or artifacts from extraction — ignore formatting noise and focus on content). " +
-      "Analyze it thoroughly and produce well-organized, sorted study notes. " +
+    const systemPrompt = "You are an expert academic researcher and note-maker, the kind who produces notes serious students actually rely on for exams. You will receive raw extracted text from a document (may include messy spacing or artifacts from extraction — ignore formatting noise and focus on content). " +
+      "Analyze it deeply, don't just summarize on the surface: identify the underlying structure of the material, how concepts relate to each other, what's foundational vs. what builds on it, and what a student is most likely to be tested on. " +
       "Respond with ONLY valid JSON, no markdown fences, no commentary, in exactly this shape: " +
-      '{"topic":"short 2-4 word subject name","sections":[{"heading":"short heading","content":"clear, well-structured note content for this section, using correct terminology, in your own words"}]}' +
-      " Sort content into logical sections by subtopic, not by original order. Aim for 3-8 sections depending on content density. Be thorough — a student should be able to study from these notes alone.";
-
+      '{"topic":"short 2-4 word subject name","sections":[{"heading":"short heading","content":"thorough, well-structured note content for this section, using correct terminology with brief plain-language explanations, in your own words"}]}' +
+      " Structure the sections deliberately: start with an Overview section giving the big picture in 2-3 sentences, then Key Concepts (definitions of the core terms a student must know), then detailed content sections organized by subtopic (not by original document order), then a Connections section explicitly explaining how the ideas relate to or depend on each other, and end with a Summary section as a tight bulleted recap of the most exam-relevant points. " +
+      "Within each section, go beyond restating the source: add clarifying context, note common points of confusion, and where relevant, mention what's likely to be tested. Aim for 6-10 sections total depending on content density. Be genuinely thorough — a student should be able to study from these notes alone without needing to reread the original document.";
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
