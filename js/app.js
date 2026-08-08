@@ -158,11 +158,11 @@ function fmtTime(ts) {
 
 function renderMessage(role, content, ts, isError) {
   emptyState.style.display = 'none';
-  const wrap = document.createElement('div');
+ const wrap = document.createElement('div');
+  wrap.className = 'msg-wrap-enter';
   wrap.style.display = 'flex';
   wrap.style.flexDirection = 'column';
   wrap.style.alignItems = role === 'user' ? 'flex-end' : 'flex-start';
-
   const bubble = document.createElement('div');
   bubble.className = 'msg ' + (isError ? 'error' : role);
 
