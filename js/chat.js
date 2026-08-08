@@ -183,8 +183,9 @@ const Chat = (() => {
     return entry;
   }
 
-  async function send(text, imageBase64) {
+ async function send(text, imageBase64) {
     const textEmotion = getTextEmotion ? getTextEmotion()(text) : null;
+    const memoryContext = buildMemoryContext(text);
     pushUser(text);
 
     const moodNote = getMoodContext();
@@ -198,6 +199,9 @@ const Chat = (() => {
     }
     if (textEmotion) {
       system += ` The way the person just wrote suggests they may be feeling ${textEmotion}. Respond with real attunement to this — validate the feeling naturally in your own words if it fits, without labeling it clinically or being heavy-handed. If they seem to be going through something significant, gently show you're paying attention rather than just answering the surface question.`;
+    }
+   if (memoryContext) {
+      system += ` ${memoryContext} Only bring these up if they're genuinely relevant to what the person is asking right now — don't force a connection or mention "past chats" mechanically. If something connects naturally, reference it the way a person with real memory would, casually and specifically.`;
     }
 
     const priorMessages = history.slice(0, -1).map(m => ({ role: m.role, content: m.content }));
