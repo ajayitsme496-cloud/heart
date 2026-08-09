@@ -361,10 +361,23 @@ async function handleDocumentUpload(file) {
 
 <script>
 async function fetchViaProxy(url) {
-  const proxied = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
-  const res = await fetch(proxied);
-  if (!res.ok) throw new Error('proxy fetch failed');
-  return await res.text();
+  const proxies = [
+    'https://corsproxy.io/?' + encodeURIComponent(url),
+    'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
+    'https://thingproxy.freeboard.io/fetch/' + url
+  ];
+  for (const proxied of proxies) {
+    try {
+      const res = await fetch(proxied);
+      if (res.ok) {
+        const text = await res.text();
+        if (text && text.length > 50) return text;
+      }
+    } catch (e) {
+      continue;
+    }
+  }
+  throw new Error('all proxies failed');
 }
 
 function stripHtmlToText(html) {
