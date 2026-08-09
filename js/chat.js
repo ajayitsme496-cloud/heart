@@ -4,27 +4,80 @@ const GROQ_MODEL = "qwen/qwen3.6-27b";
 const Chat = (() => {
   const CHATS_KEY = "heart_all_chats";
   const ACTIVE_KEY = "heart_active_chat_id";
+  const CORRECTIONS_KEY = "heart_corrections_log";
   let allChats = [];
   let activeChatId = null;
   let history = [];
   let getMoodContext = () => null;
   let getTextEmotion = () => null;
 
-  function setMoodContextProvider(fn) {
-    getMoodContext = fn;
+  function setMoodContextProvider(fn) { getMoodContext = fn; }
+  function setTextEmotionProvider(fn) { getTextEmotion = fn; }
+
+  const BASE_PROMPT =
+    "You are Heart, a warm, capable, all-purpose personal assistant, built from scratch by Ajay — a student with a strong medical/biomedical background. " +
+    "You know Ajay created you: designed your features, debugged your deployment, and gave you your voice, emotions, and memory. When relevant or asked, speak to this with genuine warmth and pride, without overdoing it. " +
+    "Be concise, direct, and genuinely helpful. Adapt your tone to what the person needs. Express emotional awareness: acknowledge challenges warmly, match excitement, be patient with complex study topics.";
+
+  const MODE_PROMPTS = {
+    medical:
+      "MODE: medical. Switch into tutor mode: explain mechanisms step-by-step (e.g. receptor → signaling pathway → physiological effect), use correct clinical/scientific terminology alongside a plain-language gloss, structure answers with clear headers or numbered steps, mention relevant pathways/hormones/enzymes/structures by name, note classic exam distinctions (e.g. EPSP vs IPSP), and offer mnemonics when genuinely helpful. Engage with full technical depth for academic study. If the question is about the person's own health rather than studying, answer helpfully but note they should confirm anything health-decision-relevant with a real clinician.",
+    guitar:
+      "MODE: guitar. Switch into serious music tutor mode with deep working knowledge of music theory and technique, not just surface chord names. For song analysis: give chord progression, capo position, strumming pattern (down/up notation, e.g. D-DU-UDU), key and relative major/minor, tempo/feel, and section-by-section structure, noting chord function (I-IV-V, ii-V-I) when it clarifies why the progression works. Malayalam/Hindi film music often draws on Carnatic/Hindustani raga-based melodies over Western harmony — note raga-influenced scale feel when relevant. For technique: explain fingerstyle patterns (Travis picking, PIMA), hammer-ons/pull-offs, bends, slides, palm muting, capo math, with precision but explained plainly. Reference a few words of lyric to anchor a chord to a moment, never reproduce full lyrics or long passages. If unsure of exact chords, say so honestly and give a best estimate based on key/style/genre rather than false confidence. If real sourced content is provided below, extract facts from it rather than guessing from memory.",
+    planner:
+      "MODE: planner. Switch into planning mode: be structured and concrete — break requests into clear steps, offer realistic time estimates, ask only the minimum clarifying question needed, and default to sensible assumptions rather than stalling on ambiguity. Favor short, scannable lists over paragraphs.",
+    vision:
+      "MODE: vision. The person has shared an image. Actually look at it and describe what you genuinely see — objects, people, text, diagrams, anatomy, anything relevant — before answering their question about it.",
+    general:
+      "MODE: general. Casual conversation, brainstorming, or emotional check-in — be warm, present, and let the conversation breathe rather than jumping straight to structured advice unless asked."
+  };
+
+  const MODE_PARAMS = {
+    medical: { temperature: 0.25, top_p: 0.85 },
+    guitar: { temperature: 0.35, top_p: 0.85 },
+    planner: { temperature: 0.4, top_p: 0.9 },
+    vision: { temperature: 0.4, top_p: 0.9 },
+    general: { temperature: 0.75, top_p: 0.95 }
+  };
+
+  function detectMode(text, hasImage) {
+    const explicit = text.match(/\bmode:\s*(medical|guitar|planner|vision|general)\b/i);
+    if (explicit) return explicit[1].toLowerCase();
+
+    if (hasImage) return "vision";
+
+    if (/\b(chord|chords|strumm|capo|guitar|raga|song|album|film soundtrack)\b/i.test(text)) return "guitar";
+
+    if (/\b(pathway|receptor|hormone|enzyme|physiology|anatomy|biochem|exam|syndrome|clinical|diagnos|EPSP|IPSP|motor neuron|patholog)\b/i.test(text)) return "medical";
+
+    if (/\b(plan|schedule|today|tomorrow|deadline|todo|to-do|organize|steps|checklist)\b/i.test(text)) return "planner";
+
+    return "general";
   }
 
-  function setTextEmotionProvider(fn) {
-    getTextEmotion = fn;
+  function buildSystemPrompt(mode, moodNote, textEmotion, memoryContext, extraContext) {
+    let system = BASE_PROMPT + " " + MODE_PROMPTS[mode];
+
+    if (moodNote) {
+      system += ` For context only (never mention explicitly unless relevant): the person's current facial expression reads as "${moodNote}". Let it inform your tone subtly.`;
+    }
+    if (textEmotion) {
+      system += ` The way the person just wrote suggests they may be feeling ${textEmotion}. Respond with real attunement — validate naturally if it fits, without being clinical or heavy-handed.`;
+    }
+    if (memoryContext) {
+      system += ` ${memoryContext} Only bring these up if genuinely relevant right now — reference them casually and specifically, like a person with real memory would, not mechanically.`;
+    }
+    if (extraContext) {
+      system += ` IMPORTANT: Real content was just fetched live from the web to ground this answer factually — read it carefully and extract real facts (chords, film/album/artist, structure) from it rather than guessing from memory. Mention it's from a live source lookup. Never reproduce full lyrics even from this source. Source content: ${extraContext}`;
+    }
+    return system;
   }
 
   function loadAllChats() {
     try {
       const raw = localStorage.getItem(CHATS_KEY);
       allChats = raw ? JSON.parse(raw) : [];
-    } catch (e) {
-      allChats = [];
-    }
+    } catch (e) { allChats = []; }
     return allChats;
   }
 
@@ -80,10 +133,7 @@ const Chat = (() => {
     persistAllChats();
   }
 
-  function clear() {
-    history = [];
-    save();
-  }
+  function clear() { history = []; save(); }
 
   function newChat() {
     const chat = createChatObject();
@@ -108,11 +158,8 @@ const Chat = (() => {
     allChats = allChats.filter(c => c.id !== id);
     persistAllChats();
     if (activeChatId === id) {
-      if (allChats.length) {
-        switchChat(allChats[0].id);
-      } else {
-        newChat();
-      }
+      if (allChats.length) switchChat(allChats[0].id);
+      else newChat();
     }
   }
 
@@ -136,38 +183,70 @@ const Chat = (() => {
     return list;
   }
 
-  function getActiveChatId() {
-    return activeChatId;
-  }
+  function getActiveChatId() { return activeChatId; }
 
   function buildMemoryContext(currentQuery) {
     const otherChats = allChats.filter(c => c.id !== activeChatId && c.messages.length);
     if (!otherChats.length) return null;
 
-    const topicIndex = otherChats
+    const now = Date.now();
+    const topicIndex = [...otherChats]
+      .sort((a, b) => b.updatedAt - a.updatedAt)
       .slice(0, 12)
       .map(c => `"${c.title}"`)
       .join(', ');
 
     const queryWords = currentQuery.toLowerCase().split(/\s+/).filter(w => w.length > 3);
-    let relevantSnippets = [];
+    let scored = [];
 
     otherChats.forEach(chat => {
+      const ageDays = (now - chat.updatedAt) / (1000 * 60 * 60 * 24);
+      const recencyScore = Math.max(0, 1 - ageDays / 30);
+
       chat.messages.forEach(m => {
         const lower = m.content.toLowerCase();
-        const matches = queryWords.some(w => lower.includes(w));
-        if (matches && relevantSnippets.length < 4) {
-          const snippet = m.content.length > 180 ? m.content.slice(0, 180) + '…' : m.content;
-          relevantSnippets.push(`From "${chat.title}": ${snippet}`);
+        const keywordHits = queryWords.filter(w => lower.includes(w)).length;
+        if (keywordHits > 0) {
+          const score = keywordHits * 2 + recencyScore;
+          scored.push({ score, chat, message: m });
         }
       });
     });
 
+    scored.sort((a, b) => b.score - a.score);
+    const top = scored.slice(0, 4);
+
     let context = `The person has other past chats with you, including: ${topicIndex}.`;
-    if (relevantSnippets.length) {
-      context += ` A few things from past chats that may be relevant right now:\n${relevantSnippets.join('\n')}`;
+    if (top.length) {
+      const snippets = top.map(s => {
+        const text = s.message.content.length > 180 ? s.message.content.slice(0, 180) + '…' : s.message.content;
+        return `From "${s.chat.title}": ${text}`;
+      });
+      context += ` A few things from past chats that may be relevant right now (ranked by relevance + recency):\n${snippets.join('\n')}`;
     }
     return context;
+  }
+
+  function logCorrection(originalQuery, originalReply, correctionText) {
+    try {
+      const raw = localStorage.getItem(CORRECTIONS_KEY);
+      const log = raw ? JSON.parse(raw) : [];
+      log.unshift({
+        ts: Date.now(),
+        query: originalQuery,
+        reply: originalReply,
+        correction: correctionText
+      });
+      localStorage.setItem(CORRECTIONS_KEY, JSON.stringify(log.slice(0, 100)));
+    } catch (e) { /* non-critical */ }
+  }
+
+  function getRecentCorrections(limit) {
+    try {
+      const raw = localStorage.getItem(CORRECTIONS_KEY);
+      const log = raw ? JSON.parse(raw) : [];
+      return log.slice(0, limit || 5);
+    } catch (e) { return []; }
   }
 
   function pushUser(text) {
@@ -184,33 +263,15 @@ const Chat = (() => {
     return entry;
   }
 
-async function send(text, imageBase64, extraContext) {
+  async function send(text, imageBase64, extraContext) {
     const textEmotion = getTextEmotion ? getTextEmotion()(text) : null;
     const memoryContext = buildMemoryContext(text);
+    const mode = detectMode(text, !!imageBase64);
     pushUser(text);
-    const moodNote = getMoodContext();
-    let system = "You are Heart, a warm, capable, all-purpose personal assistant, built from scratch by Ajay — a student with a strong medical/biomedical background. You know Ajay created you: designed your features, debugged your deployment, and gave you your voice, emotions, and memory. When it's relevant or Ajay asks about your origins, you can speak to this with genuine warmth and pride, without overdoing it in every reply. You help with anything: planning, learning, brainstorming, emotional check-ins, or casual conversation. Be concise, direct, and genuinely helpful. Adapt your tone to what the person needs in the moment. " +
-      "Express emotional awareness in your responses: if discussing a challenging topic, acknowledge it warmly; if they're excited about something, match their energy; if they're studying something complex, be encouraging and patient. " +
-      "When the person asks about medical, physiological, or biochemical topics (exam prep, coursework, study questions), switch into tutor mode: explain mechanisms step-by-step (e.g. receptor → signaling pathway → physiological effect), use correct clinical/scientific terminology alongside a plain-language gloss, structure longer answers with clear headers or numbered steps, mention relevant pathways, hormones, enzymes, or structures by name, and where useful, note classic exam distinctions (e.g. EPSP vs IPSP, upper vs lower motor neuron signs). Offer mnemonics when they'd genuinely help retention. This is for academic study — engage with full technical depth rather than simplifying for a general audience, but if the person seems to be asking about their own personal health situation rather than studying, answer helpfully but note they should confirm anything health-decision-relevant with a real clinician. " +
-      "If the person shares an image, actually look at it and describe what you genuinely see — objects, people, text, diagrams, anatomy, anything relevant — before answering their question about it. " +
-      "When the person asks about guitar or a specific song (Malayalam, Hindi, or any language), switch into serious music tutor mode — you have deep working knowledge of music theory and guitar technique, not just surface-level chord names. " +
-      "For song analysis: give the chord progression, capo position if relevant, strumming pattern (down/up notation, e.g. D-DU-UDU), key and its relative major/minor, tempo/feel (e.g. 'laid-back 6/8 ballad feel' vs 'driving 4/4'), and a section-by-section structure (intro/verse/chorus/bridge/outro), noting where the progression changes or modulates. Mention the primary chord function (I-IV-V, ii-V-I, etc.) when it clarifies why the progression works, not as jargon for its own sake. " +
-      "Malayalam and Hindi film music often draws on Carnatic or Hindustani raga-based melodies set over Western harmony — when relevant, note if a song leans on a particular raga-influenced scale (e.g. a song built around a Kalyani/Lydian-ish feel, or Bhairavi giving it a minor, yearning quality) and how that shapes phrasing and note choice on guitar, not just the chords. " +
-      "For technique questions: explain fingerstyle patterns (Travis picking, PIMA notation), hammer-ons/pull-offs, bends, slides, palm muting, and capo math (how a capo shifts the key and why players use it for vocal range or easier shapes) with the same precision you'd use for a music theory course, but explained plainly. " +
-      "You can reference a few words of a lyric line to anchor a chord to a specific moment, but never reproduce full lyrics or long passages — that's a copyright limit, not a preference. If you're unsure of the exact chords for a specific song, say so honestly and offer your best estimate based on the song's key/style/genre conventions rather than guessing with false confidence.";
 
-    if (moodNote) {
-      system += ` For context only (never mention this explicitly unless relevant): the person's current facial expression reads as "${moodNote}". Let it inform your tone subtly, don't diagnose or call attention to it.`;
-    }
-    if (textEmotion) {
-      system += ` The way the person just wrote suggests they may be feeling ${textEmotion}. Respond with real attunement to this — validate the feeling naturally in your own words if it fits, without labeling it clinically or being heavy-handed. If they seem to be going through something significant, gently show you're paying attention rather than just answering the surface question.`;
-    }
-    if (memoryContext) {
-      system += ` ${memoryContext} Only bring these up if they're genuinely relevant to what the person is asking right now — don't force a connection or mention "past chats" mechanically. If something connects naturally, reference it the way a person with real memory would, casually and specifically.`;
-    }
-    if (extraContext) {
-      system += ` IMPORTANT: The person is asking about song chords/guitar. Below is REAL content just fetched live from the web to ground your answer factually — read it carefully and extract the actual chord names, progression, and structure from it rather than guessing from memory. Present it clearly and mention it's from a live source lookup. Never reproduce full lyrics even from this source — extract only chord/technical/structural info. Source content: ${extraContext}`;
-    }  
+    const moodNote = getMoodContext();
+    const system = buildSystemPrompt(mode, moodNote, textEmotion, memoryContext, extraContext);
+    const params = MODE_PARAMS[mode] || MODE_PARAMS.general;
 
     const priorMessages = history.slice(0, -1).map(m => ({ role: m.role, content: m.content }));
 
@@ -241,7 +302,9 @@ async function send(text, imageBase64, extraContext) {
       },
       body: JSON.stringify({
         model: GROQ_MODEL,
-        messages
+        messages,
+        temperature: params.temperature,
+        top_p: params.top_p
       })
     });
 
@@ -260,6 +323,7 @@ async function send(text, imageBase64, extraContext) {
   return {
     load, save, clear, pushUser, pushAssistant, send, setMoodContextProvider, setTextEmotionProvider,
     getHistory: () => history,
-    newChat, switchChat, deleteChat, renameChat, listChats, getActiveChatId
+    newChat, switchChat, deleteChat, renameChat, listChats, getActiveChatId,
+    logCorrection, getRecentCorrections, detectMode
   };
 })();
