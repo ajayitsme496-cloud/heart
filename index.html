@@ -11,12 +11,28 @@
 <meta name="apple-mobile-web-app-title" content="Heart">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#17111d">
+<meta name="theme-color" content="#0b1615">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;1,500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
 <link rel="stylesheet" href="css/style.css">
+
+<style>
+.live-caption {
+  display: none;
+  font-size: 11px;
+  font-family: var(--mono, monospace);
+  color: var(--text-mid, #9fc4bd);
+  background: var(--surface, #12211f);
+  border-left: 2px solid var(--pulse, #ff5d5d);
+  padding: 6px 10px;
+  margin: 8px 16px 0;
+  border-radius: 0 8px 8px 0;
+  line-height: 1.4;
+}
+</style>
 </head>
 <body>
 <div id="app">
@@ -72,6 +88,7 @@
         <button class="icon-only-btn" id="cameraToggleBtn" title="Toggle face awareness">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"></path><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
         </button>
+        <button class="icon-only-btn" id="liveIdentifyBtn" title="Live identify (describes what the camera sees)">👁️</button>
         <button class="icon-only-btn" id="voiceToggleBtn" title="Toggle voice">🔊</button>
         <button class="icon-only-btn" id="imageUploadBtn" title="Upload image">🖼️</button>
         <button class="icon-only-btn" id="pdfUploadBtn" title="Upload document">📄</button>
@@ -86,10 +103,13 @@
         <path class="live-vitals-line" d="M0,15 L100,15 L115,15 L125,3 L135,27 L145,15 L160,15 L400,15" />
       </svg>
     </div>
+
     <div id="mini-camera-wrap" class="mini-camera-wrap" style="display:none;">
       <video id="liveVideo" autoplay playsinline muted></video>
       <div class="mini-label" id="moodLabel">—</div>
     </div>
+
+    <div id="liveCaption" class="live-caption"></div>
 
     <div class="pulse-wrap" id="pulseWrap">
       <svg viewBox="0 0 340 34" preserveAspectRatio="none">
@@ -116,7 +136,7 @@
     <div id="chat">
       <div class="empty-state" id="emptyState">
         <div class="glyph">heart</div>
-        <p>Ask me anything — plan something, talk through a problem, learn a topic, or just check in. Upload images or documents to analyze them. Tap the camera icon above for mood sensing.</p>
+        <p>Ask me anything — plan something, talk through a problem, learn a topic, or just check in. Upload images or documents to analyze them. Tap 👁️ for live camera understanding.</p>
         <div class="chips">
           <div class="chip" data-prompt="Help me plan my day">Plan my day</div>
           <div class="chip" data-prompt="Explain something to me — pick a topic and I'll tell you what interests me">Explain something</div>
@@ -336,6 +356,203 @@ async function handleDocumentUpload(file) {
   } finally {
     setThinking(false);
   }
+}
+</script>
+
+<script>
+async function fetchViaProxy(url) {
+  const proxied = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
+  const res = await fetch(proxied);
+  if (!res.ok) throw new Error('proxy fetch failed');
+  return await res.text();
+}
+
+function stripHtmlToText(html) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  doc.querySelectorAll('script, style, nav, header, footer, noscript').forEach(el => el.remove());
+  const text = doc.body ? doc.body.textContent : '';
+  return text.replace(/\s+/g, ' ').trim();
+}
+
+async function searchChordSource(songQuery) {
+  const isChordSpecific = /\b(chord|chords|strumm|capo|guitar tab|tabs?)\b/i.test(songQuery);
+  const searchTerm = isChordSpecific ? songQuery + ' guitar chords' : songQuery + ' song film album';
+  const searchUrl = 'https://html.duckduckgo.com/html/?q=' + encodeURIComponent(searchTerm);
+  const searchHtml = await fetchViaProxy(searchUrl);
+  const doc = new DOMParser().parseFromString(searchHtml, 'text/html');
+  const links = Array.from(doc.querySelectorAll('a.result__a'))
+    .map(a => a.getAttribute('href'))
+    .filter(Boolean);
+  if (!links.length) return null;
+
+  const preferredChord = links.find(l =>
+    /ultimate-guitar|e-chords|chordsworld|guitartabs|hindi.*chord|malayalam.*chord|chordify/i.test(l)
+  );
+  const preferredMeta = links.find(l =>
+    /wikipedia|imdb|saregama|jiosaavn|spotify|wynk|gaana/i.test(l)
+  );
+
+  const toFetch = [preferredChord, preferredMeta, links[0]].filter(Boolean);
+  const uniqueToFetch = [...new Set(toFetch)].slice(0, 2);
+
+  const sources = [];
+  for (const url of uniqueToFetch) {
+    try {
+      const pageHtml = await fetchViaProxy(url);
+      const text = stripHtmlToText(pageHtml);
+      if (text && text.length > 100) {
+        sources.push({ url, text: text.slice(0, 4000) });
+      }
+    } catch (e) {
+      // skip this source, try next
+    }
+  }
+
+  if (!sources.length) return null;
+
+  const combined = sources.map(s => `(source: ${s.url})\n${s.text}`).join('\n\n---\n\n');
+  return { url: sources[0].url, text: combined };
+}
+
+function looksLikeChordQuery(text) {
+  return /\b(chord|chords|strumm|capo|guitar tab|tabs?|which (film|movie|album)|what (film|movie|album)|identify.*song|which song|what song|song.*from)\b/i.test(text);
+}
+
+const originalHandleSend = handleSend;
+handleSend = async function (text) {
+  if (!text.trim()) return;
+  renderMessage('user', text, Date.now());
+  textInput.value = '';
+  textInput.style.height = 'auto';
+  setThinking(true);
+
+  try {
+    let extraContext = null;
+
+    if (looksLikeChordQuery(text)) {
+      try {
+        const result = await searchChordSource(text);
+        if (result) {
+          extraContext = `(source: ${result.url})\n\n${result.text}`;
+        }
+      } catch (lookupErr) {
+        // Silent fallback — Heart will use best-effort memory with honesty caveat
+      }
+    }
+
+    const reply = await Chat.send(text, null, extraContext);
+    renderMessage('assistant', reply, Date.now());
+    Voice.speak(reply);
+  } catch (err) {
+    renderMessage('assistant', 'Something went wrong reaching Heart. Check your API key and connection, then try again.', Date.now(), true);
+  } finally {
+    setThinking(false);
+  }
+};
+</script>
+
+<script>
+let liveIdentifyOn = false;
+let liveIdentifyTimer = null;
+let lastCaption = '';
+let ownedLiveStream = false;
+
+const liveIdentifyBtn = document.getElementById('liveIdentifyBtn');
+const liveCaptionEl = document.getElementById('liveCaption');
+
+liveIdentifyBtn.addEventListener('click', async () => {
+  liveIdentifyOn = !liveIdentifyOn;
+  liveIdentifyBtn.classList.toggle('active', liveIdentifyOn);
+
+  if (liveIdentifyOn) {
+    miniCameraWrap.style.display = 'block';
+    liveCaptionEl.style.display = 'block';
+    liveCaptionEl.textContent = '👁️ Watching…';
+
+    if (!liveVideo.srcObject) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        liveVideo.srcObject = stream;
+        ownedLiveStream = true;
+      } catch (e) {
+        liveCaptionEl.textContent = 'Camera unavailable — check permissions.';
+        liveIdentifyOn = false;
+        liveIdentifyBtn.classList.remove('active');
+        return;
+      }
+    }
+    runLiveIdentifyLoop();
+  } else {
+    clearTimeout(liveIdentifyTimer);
+    liveCaptionEl.style.display = 'none';
+    liveCaptionEl.textContent = '';
+    if (ownedLiveStream && liveVideo.srcObject) {
+      liveVideo.srcObject.getTracks().forEach(t => t.stop());
+      liveVideo.srcObject = null;
+      ownedLiveStream = false;
+    }
+    if (typeof livenessOn !== 'undefined' && !livenessOn) {
+      miniCameraWrap.style.display = 'none';
+    }
+  }
+});
+
+function captureFrameBase64(video) {
+  const canvas = document.createElement('canvas');
+  canvas.width = video.videoWidth || 320;
+  canvas.height = video.videoHeight || 240;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL('image/jpeg', 0.6);
+}
+
+async function describeFrame(base64Image) {
+  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${GROQ_API_KEY}`
+    },
+    body: JSON.stringify({
+      model: GROQ_MODEL,
+      messages: [
+        {
+          role: "system",
+          content: "You are a live vision assistant narrating a continuous camera feed. In ONE short natural sentence, describe what's visible right now — objects, people, or text/signs (read any visible text aloud if present). Be extremely concise since this repeats every few seconds. If the view is unclear or unchanged, say so briefly."
+        },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "What do you see right now?" },
+            { type: "image_url", image_url: { url: base64Image } }
+          ]
+        }
+      ]
+    })
+  });
+  if (!response.ok) throw new Error("live vision error " + response.status);
+  const data = await response.json();
+  let reply = data.choices?.[0]?.message?.content?.trim() || "";
+  reply = reply.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+  return reply;
+}
+
+async function runLiveIdentifyLoop() {
+  if (!liveIdentifyOn) return;
+  try {
+    if (liveVideo.readyState >= 2) {
+      const frame = captureFrameBase64(liveVideo);
+      const caption = await describeFrame(frame);
+      if (caption && caption !== lastCaption) {
+        lastCaption = caption;
+        liveCaptionEl.textContent = '👁️ ' + caption;
+        Voice.speak(caption);
+      }
+    }
+  } catch (e) {
+    liveCaptionEl.textContent = '👁️ Live view paused (connection issue)…';
+  }
+  liveIdentifyTimer = setTimeout(runLiveIdentifyLoop, 6000);
 }
 </script>
 
