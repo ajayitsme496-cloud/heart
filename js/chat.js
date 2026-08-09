@@ -184,11 +184,10 @@ const Chat = (() => {
     return entry;
   }
 
-  async function send(text, imageBase64) {
+async function send(text, imageBase64, extraContext) {
     const textEmotion = getTextEmotion ? getTextEmotion()(text) : null;
     const memoryContext = buildMemoryContext(text);
     pushUser(text);
-
     const moodNote = getMoodContext();
     let system = "You are Heart, a warm, capable, all-purpose personal assistant, built from scratch by Ajay — a student with a strong medical/biomedical background. You know Ajay created you: designed your features, debugged your deployment, and gave you your voice, emotions, and memory. When it's relevant or Ajay asks about your origins, you can speak to this with genuine warmth and pride, without overdoing it in every reply. You help with anything: planning, learning, brainstorming, emotional check-ins, or casual conversation. Be concise, direct, and genuinely helpful. Adapt your tone to what the person needs in the moment. " +
       "Express emotional awareness in your responses: if discussing a challenging topic, acknowledge it warmly; if they're excited about something, match their energy; if they're studying something complex, be encouraging and patient. " +
@@ -209,6 +208,9 @@ const Chat = (() => {
     if (memoryContext) {
       system += ` ${memoryContext} Only bring these up if they're genuinely relevant to what the person is asking right now — don't force a connection or mention "past chats" mechanically. If something connects naturally, reference it the way a person with real memory would, casually and specifically.`;
     }
+    if (extraContext) {
+      system += ` IMPORTANT: The person is asking about song chords/guitar. Below is REAL content just fetched live from the web to ground your answer factually — read it carefully and extract the actual chord names, progression, and structure from it rather than guessing from memory. Present it clearly and mention it's from a live source lookup. Never reproduce full lyrics even from this source — extract only chord/technical/structural info. Source content: ${extraContext}`;
+    }  
 
     const priorMessages = history.slice(0, -1).map(m => ({ role: m.role, content: m.content }));
 
