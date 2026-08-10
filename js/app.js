@@ -158,11 +158,12 @@ function fmtTime(ts) {
 
 function renderMessage(role, content, ts, isError) {
   emptyState.style.display = 'none';
- const wrap = document.createElement('div');
+  const wrap = document.createElement('div');
   wrap.className = 'msg-wrap-enter';
   wrap.style.display = 'flex';
   wrap.style.flexDirection = 'column';
   wrap.style.alignItems = role === 'user' ? 'flex-end' : 'flex-start';
+
   const bubble = document.createElement('div');
   bubble.className = 'msg ' + (isError ? 'error' : role);
 
@@ -179,7 +180,7 @@ function renderMessage(role, content, ts, isError) {
   wrap.appendChild(bubble);
   wrap.appendChild(time);
 
-if (role === 'assistant' && !isError) {
+  if (role === 'assistant' && !isError) {
     const actionsRow = document.createElement('div');
     actionsRow.style.display = 'flex';
     actionsRow.style.gap = '6px';
@@ -205,66 +206,12 @@ if (role === 'assistant' && !isError) {
     };
     actionsRow.appendChild(saveBtn);
 
-    const currentMode = Chat.detectMode(
-      Chat.getHistory().length >= 2 ? Chat.getHistory()[Chat.getHistory().length - 2].content : '',
-      false
-    );
-
-    function makeFeedbackBtn(label, tag) {
-      const btn = document.createElement('button');
-      btn.textContent = label;
-      btn.style.fontSize = '11px';
-      btn.style.padding = '4px 8px';
-      btn.style.background = 'var(--surface)';
-      btn.style.border = '1px solid var(--line)';
-      btn.style.color = 'var(--text-mid)';
-      btn.style.borderRadius = '999px';
-      btn.style.cursor = 'pointer';
-      btn.onclick = () => {
-        Chat.logFeedback(currentMode, tag);
-        btn.textContent = '✓';
-        btn.style.color = 'var(--good)';
-        setTimeout(() => { btn.textContent = label; btn.style.color = 'var(--text-mid)'; }, 1200);
-      };
-      return btn;
-    }
-
-    actionsRow.appendChild(makeFeedbackBtn('👍', 'up'));
-    actionsRow.appendChild(makeFeedbackBtn('👎', 'down'));
-    actionsRow.appendChild(makeFeedbackBtn('Simplify', 'simplify'));
-    actionsRow.appendChild(makeFeedbackBtn('More depth', 'more_depth'));
-
-    wrap.appendChild(actionsRow);
-  }if (role === 'assistant' && !isError) {
-    const actionsRow = document.createElement('div');
-    actionsRow.style.display = 'flex';
-    actionsRow.style.gap = '6px';
-    actionsRow.style.marginTop = '8px';
-    actionsRow.style.flexWrap = 'wrap';
-
-    const saveBtn = document.createElement('button');
-    saveBtn.className = 'note-save-btn';
-    saveBtn.textContent = '💾 Save';
-    saveBtn.style.fontSize = '12px';
-    saveBtn.style.padding = '4px 8px';
-    saveBtn.style.background = 'var(--pulse-dim)';
-    saveBtn.style.border = 'none';
-    saveBtn.style.color = '#0b1615';
-    saveBtn.style.borderRadius = '999px';
-    saveBtn.style.cursor = 'pointer';
-    saveBtn.onclick = () => {
-      const topic = prompt('Topic for this note?') || 'General';
-      Notes.add(content, topic);
-      saveBtn.textContent = '✓ Saved';
-      saveBtn.style.background = 'var(--good)';
-      setTimeout(() => { saveBtn.textContent = '💾 Save'; saveBtn.style.background = 'var(--pulse-dim)'; }, 2000);
-    };
-    actionsRow.appendChild(saveBtn);
-
-    const currentMode = Chat.detectMode(
-      Chat.getHistory().length >= 2 ? Chat.getHistory()[Chat.getHistory().length - 2].content : '',
-      false
-    );
+    let currentMode = 'general';
+    try {
+      const hist = Chat.getHistory();
+      const priorText = hist.length >= 2 ? hist[hist.length - 2].content : '';
+      currentMode = Chat.detectMode(priorText, false);
+    } catch (e) { /* fallback to general */ }
 
     function makeFeedbackBtn(label, tag) {
       const btn = document.createElement('button');
@@ -292,7 +239,11 @@ if (role === 'assistant' && !isError) {
 
     wrap.appendChild(actionsRow);
   }
-  
+
+  chatEl.appendChild(wrap);
+  chatEl.scrollTop = chatEl.scrollHeight;
+}
+
 function setThinking(on) {
   pulseWrap.classList.toggle('active', on);
   sendBtn.disabled = on;
@@ -621,7 +572,7 @@ function renderChatsList() {
     const preview = lastMsg ? lastMsg.content.substring(0, 90) : 'No messages yet';
     const chatItem = document.createElement('div');
     chatItem.className = 'note-item';
-    if (chat.id === activeId) chatItem.style.borderColor = 'var(--heart)';
+    if (chat.id === activeId) chatItem.style.borderColor = 'var(--pulse)';
     chatItem.innerHTML = `
       <div class="note-header">
         <span class="note-topic">${chat.title}${chat.id === activeId ? ' • current' : ''}</span>
@@ -663,4 +614,3 @@ function renderChatsList() {
 }
 
 boot();
-}
