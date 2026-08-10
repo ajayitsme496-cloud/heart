@@ -371,7 +371,7 @@ const Chat = (() => {
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_API_KEY}` },
-      body: JSON.stringify({ model: GROQ_MODEL, messages, temperature, top_p: baseParams.top_p })
+      body: JSON.stringify({ model: GROQ_MODEL, messages, temperature, top_p: baseParams.top_p, max_tokens: 4096 })
     });
 
     if (!response.ok) {
