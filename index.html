@@ -454,38 +454,42 @@ async function searchMedicalSource(query) {
   }
 }
 
-const originalHandleSend = handleSend;
-handleSend = async function (text) {
-  if (!text.trim()) return;
-  renderMessage('user', text, Date.now());
-  textInput.value = '';
-  textInput.style.height = 'auto';
-  setThinking(true);
+if (typeof handleSend === 'function') {
+  const originalHandleSend = handleSend;
+  window.handleSend = async function (text) {
+    if (!text.trim()) return;
+    renderMessage('user', text, Date.now());
+    textInput.value = '';
+    textInput.style.height = 'auto';
+    setThinking(true);
 
-  try {
-    let extraContext = null;
+    try {
+      let extraContext = null;
 
-    if (looksLikeChordQuery(text)) {
-      try {
-        const result = await searchChordSource(text);
-        if (result) extraContext = `(source: ${result.url})\n\n${result.text}`;
-      } catch (lookupErr) { /* silent fallback */ }
-    } else if (Chat.detectMode(text, false) === 'medical' && looksLikeMedicalGroundingQuery(text)) {
-      try {
-        const result = await searchMedicalSource(text);
-        if (result) extraContext = `(source: ${result.url})\n\n${result.text}`;
-      } catch (lookupErr) { /* silent fallback */ }
+      if (looksLikeChordQuery(text)) {
+        try {
+          const result = await searchChordSource(text);
+          if (result) extraContext = `(source: ${result.url})\n\n${result.text}`;
+        } catch (lookupErr) { /* silent fallback */ }
+      } else if (Chat.detectMode(text, false) === 'medical' && looksLikeMedicalGroundingQuery(text)) {
+        try {
+          const result = await searchMedicalSource(text);
+          if (result) extraContext = `(source: ${result.url})\n\n${result.text}`;
+        } catch (lookupErr) { /* silent fallback */ }
+      }
+
+      const reply = await Chat.send(text, null, extraContext);
+      renderMessage('assistant', reply, Date.now());
+      Voice.speak(reply);
+    } catch (err) {
+      renderMessage('assistant', 'Something went wrong reaching Heart. Check your API key and connection, then try again.', Date.now(), true);
+    } finally {
+      setThinking(false);
     }
-
-    const reply = await Chat.send(text, null, extraContext);
-    renderMessage('assistant', reply, Date.now());
-    Voice.speak(reply);
-  } catch (err) {
-    renderMessage('assistant', 'Something went wrong reaching Heart. Check your API key and connection, then try again.', Date.now(), true);
-  } finally {
-    setThinking(false);
-  }
-};
+  };
+} else {
+  console.warn('Heart: handleSend not found in app.js — chord/song web lookup skipped, basic chat still works.');
+}
 </script>
 
 <script>
