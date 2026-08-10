@@ -663,3 +663,4 @@ function renderChatsList() {
 }
 
 boot();
+}
