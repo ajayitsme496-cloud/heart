@@ -357,8 +357,7 @@ const Chat = (() => {
     const baseParams = MODE_PARAMS[mode] || MODE_PARAMS.general;
     const temperature = Math.max(0.15, Math.min(0.95, baseParams.temperature + adjustment.tempDelta));
 
-    const priorMessages = history.slice(0, -1).map(m => ({ role: m.role, content: m.content }));
-
+    const priorMessages = history.slice(-16, -1).map(m => ({ role: m.role, content: m.content }));
     let currentUserMessage;
     if (imageBase64) {
       currentUserMessage = { role: "user", content: [{ type: "text", text: text }, { type: "image_url", image_url: { url: imageBase64 } }] };
@@ -371,7 +370,7 @@ const Chat = (() => {
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_API_KEY}` },
-      body: JSON.stringify({ model: GROQ_MODEL, messages, temperature, top_p: baseParams.top_p, max_tokens: 4096 })
+     body: JSON.stringify({ model: GROQ_MODEL, messages, temperature, top_p: baseParams.top_p, max_tokens: 2048 })
     });
 
     if (!response.ok) {
