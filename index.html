@@ -431,6 +431,29 @@ function looksLikeChordQuery(text) {
   return /\b(chord|chords|strumm|capo|guitar tab|tabs?|which (film|movie|album)|what (film|movie|album)|identify.*song|which song|what song|song.*from)\b/i.test(text);
 }
 
+function looksLikeMedicalGroundingQuery(text) {
+  return /\b(guideline|latest research|current recommend|studies show|evidence|clinical trial|pubmed|according to|recent findings|is it true that)\b/i.test(text);
+}
+
+async function searchMedicalSource(query) {
+  const searchUrl = 'https://html.duckduckgo.com/html/?q=' + encodeURIComponent(query + ' site:ncbi.nlm.nih.gov OR site:pubmed.ncbi.nlm.nih.gov OR site:mayoclinic.org OR site:who.int OR site:nice.org.uk');
+  const searchHtml = await fetchViaProxy(searchUrl);
+  const doc = new DOMParser().parseFromString(searchHtml, 'text/html');
+  const links = Array.from(doc.querySelectorAll('a.result__a')).map(a => a.getAttribute('href')).filter(Boolean);
+  if (!links.length) return null;
+
+  const preferred = links.find(l => /pubmed|ncbi|mayoclinic|who\.int|nice\.org\.uk/i.test(l)) || links[0];
+
+  try {
+    const pageHtml = await fetchViaProxy(preferred);
+    const text = stripHtmlToText(pageHtml);
+    if (!text || text.length < 100) return null;
+    return { url: preferred, text: text.slice(0, 4000) };
+  } catch (e) {
+    return null;
+  }
+}
+
 const originalHandleSend = handleSend;
 handleSend = async function (text) {
   if (!text.trim()) return;
@@ -445,12 +468,13 @@ handleSend = async function (text) {
     if (looksLikeChordQuery(text)) {
       try {
         const result = await searchChordSource(text);
-        if (result) {
-          extraContext = `(source: ${result.url})\n\n${result.text}`;
-        }
-      } catch (lookupErr) {
-        // Silent fallback — Heart will use best-effort memory with honesty caveat
-      }
+        if (result) extraContext = `(source: ${result.url})\n\n${result.text}`;
+      } catch (lookupErr) { /* silent fallback */ }
+    } else if (Chat.detectMode(text, false) === 'medical' && looksLikeMedicalGroundingQuery(text)) {
+      try {
+        const result = await searchMedicalSource(text);
+        if (result) extraContext = `(source: ${result.url})\n\n${result.text}`;
+      } catch (lookupErr) { /* silent fallback */ }
     }
 
     const reply = await Chat.send(text, null, extraContext);
