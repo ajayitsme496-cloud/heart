@@ -1,4 +1,4 @@
-const GROQ_API_KEY = "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";
+const GROQ_API_KEY = "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";
 const GROQ_MODEL = "qwen/qwen3.6-27b";
 
 const Chat = (() => {
